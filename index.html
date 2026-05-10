@@ -2878,6 +2878,19 @@ document.getElementById("creditDonateLink")?.addEventListener("click", e => {
   document.querySelector('.tab[data-tab="support"]')?.click();
 });
 
+// Embed mode (?embed=1) — hide the site's own sticky logo footer so it
+// doesn't double up with the parent page's footer/header inside an iframe.
+// Adds a CSS class on <html> so styles can react if needed.
+(() => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("embed") === "1") {
+    document.documentElement.classList.add("embed-mode");
+    const f = document.querySelector(".logos-footer");
+    if (f) f.style.display = "none";
+    document.body.style.paddingBottom = "0";
+  }
+})();
+
 // "Clear" button in the UAVs flight list — removes every UAV overlay this
 // tab has put on the map (both the multi-layer selections and the legacy
 // L-band catalog.json selection if any) and resets selection state.
