@@ -1,0 +1,41 @@
+class_id,label,color
+111,Individual Housing,#fee6c2
+112,Collective Housing,#e9c16f
+121,Industrial Area,#c08484
+131,Commercial/Office Area,#ed83b8
+132,Mixed Commercial Area,#dfb0a4
+141,Cultural/Sports/Recreational Area,#f6718a
+151,Airport,#e526fe
+152,Port,#c53251
+153,Railroad,#fc044e
+154,Road,#f7412a
+155,Other Transportation and Communication Facilities,#730000
+161,Basic Environmental Facilities,#f67512
+162,Educational and Administrative Facilities,#ff7a00
+163,Other Public Facilities,#c7581b
+211,Redeveloped Rice Field,#ffffbf
+212,Not Redeveloped Rice Field,#f4e6a8
+221,Redeveloped Field,#f7f966
+222,Not Redeveloped Field,#f5e40a
+231,Facility Cultivation Area,#dfdc73
+241,Orchard,#b8b12c
+251,Ranch and Farm,#b89112
+252,Other Cultivation Area,#aa6400
+311,Deciduous Forest,#33a02c
+321,Coniferous Forest,#0a4f40
+331,Mixed Forest,#336633
+411,Natural Grassland,#a1d594
+421,Golf Course,#80e45a
+422,Cemetry,#71b05a
+423,Other Grassland,#607e33
+511,Inland Wetland,#b4a7d0
+521,Mud Flat,#997499
+611,Beach,#c1dbec
+612,Riverbank,#abc5ca
+613,Rock,#abb6a5
+621,Natural Lighting Area,#585a8a
+622,Stadium,#7bb5ac
+623,Other Bare Land,#9ff2ff
+711,River,#3ea7ff
+712,Reservoir,#5d6dff
+721,Ocean,#1739ff

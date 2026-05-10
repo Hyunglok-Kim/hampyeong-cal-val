@@ -1,0 +1,17 @@
+.DS_Store
+__pycache__/
+*.pyc
+*.pyo
+
+# Raw NCs — too big for the host; the site only needs the rendered PNGs +
+# catalog.csv from data/uav/ and data/satellites/.
+data/uav/raw/
+data/satellites/raw/
+
+# Picture originals — only the _web/ thumbnails travel to the host.
+data/pictures/**/_orig/
+
+# Editor / OS
+.vscode/
+.idea/
+.claude/

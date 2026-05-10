@@ -1,0 +1,3589 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hampyeong Cal/Val Site - HydroAI</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+<style>
+  :root {
+    --bg: #f6f7f9;             /* page background, very subtle cool gray */
+    --surface: #ffffff;        /* white card / map container */
+    --panel: #0f172a;          /* deep slate panel (was teal) */
+    --panel-2: #1e293b;        /* slightly lighter slate (header band, etc.) */
+    --panel-text: #e2e8f0;     /* high-contrast on dark */
+    --muted: #94a3b8;          /* slate-400 - secondary on dark */
+    --muted-on-light: #64748b; /* secondary on light bg */
+    --text: #0f172a;           /* primary text on light bg */
+    --accent: #f59e0b;         /* amber */
+    --accent-hover: #d97706;
+    --accent-2: #14b8a6;       /* teal (secondary) */
+    --border: #e5e7eb;         /* hairline border on light */
+    --border-strong: #cbd5e1;  /* heavier hairline */
+    --border-dark: #334155;    /* hairline on dark surfaces */
+    --shadow-sm: 0 1px 2px rgba(15,23,42,0.06);
+    --shadow-md: 0 4px 12px -2px rgba(15,23,42,0.10), 0 2px 4px -1px rgba(15,23,42,0.06);
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
+  }
+  .wrap {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 18px;
+  }
+  /* top bar: tab strip on the left, credit line on the right */
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 14px;
+  }
+  .credit {
+    font-size: 12px;
+    color: var(--muted-on-light);
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+  .credit b { color: var(--text); font-weight: 600; }
+
+  /* Pictures tab — folder list (side panel) */
+  .pic-folder-list {
+    display: flex; flex-direction: column; gap: 4px;
+    max-height: 460px; overflow-y: auto; padding-right: 2px;
+  }
+  .pic-folder-empty {
+    font-size: 12px; color: var(--muted);
+    padding: 8px 4px;
+  }
+  .pic-folder-row {
+    display: flex; flex-direction: column;
+    padding: 8px 10px;
+    border: 1px solid #555; border-radius: 6px;
+    background: rgba(255,255,255,0.02);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .pic-folder-row:hover {
+    background: rgba(255,255,255,0.06);
+    border-color: #888; color: #fff;
+  }
+  .pic-folder-row.active {
+    background: rgba(56,189,248,0.18);
+    border-color: rgb(56,189,248); color: #fff;
+  }
+  .pic-folder-row .pic-folder-title {
+    font-size: 13px; font-weight: 600; color: #fff;
+  }
+  .pic-folder-row .pic-folder-meta {
+    font-size: 11px; color: var(--muted); margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Pictures tab — main gallery column */
+  .pic-gallery-header {
+    background: var(--surface);
+    border-radius: var(--radius-sm);
+    padding: 14px 18px;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 12px;
+  }
+  .pic-gallery-header h3 {
+    margin: 0; font-size: 18px; font-weight: 700;
+    color: var(--text);
+  }
+  .pic-gallery-subtitle {
+    font-size: 12px; color: var(--muted-on-light);
+    margin-top: 4px;
+  }
+  .pic-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+    padding: 4px;
+  }
+  .pic-gallery-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    font-size: 13px; color: var(--muted-on-light);
+    padding: 60px 20px;
+    background: var(--surface);
+    border-radius: var(--radius-sm);
+    border: 1px dashed rgba(15,23,42,0.18);
+  }
+  .pic-thumb {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    border-radius: 8px;
+    cursor: zoom-in;
+    background: #ddd;
+    box-shadow: 0 1px 4px rgba(15,23,42,0.08);
+    transition: transform 0.18s, box-shadow 0.18s;
+  }
+  .pic-thumb img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transition: transform 0.25s;
+    display: block;
+  }
+  .pic-thumb:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(15,23,42,0.18);
+  }
+  .pic-thumb:hover img { transform: scale(1.04); }
+
+  /* Pictures tab — lightbox */
+  .pic-lightbox {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.86);
+    z-index: 500;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pic-lb-img {
+    max-width: 92vw; max-height: 86vh;
+    object-fit: contain;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    border-radius: 4px;
+  }
+  .pic-lb-btn {
+    position: absolute;
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    border: none;
+    font-size: 28px;
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pic-lb-btn:hover { background: rgba(255,255,255,0.22); }
+  .pic-lb-btn:active { transform: scale(0.95); }
+  .pic-lb-close { top: 18px; right: 18px; font-size: 26px; line-height: 1; }
+  .pic-lb-prev  { left: 18px;  top: 50%; transform: translateY(-50%); }
+  .pic-lb-next  { right: 18px; top: 50%; transform: translateY(-50%); }
+  .pic-lb-prev:active, .pic-lb-next:active { transform: translateY(-50%) scale(0.95); }
+  .pic-lb-caption {
+    position: absolute;
+    bottom: 22px; left: 50%; transform: translateX(-50%);
+    color: #fff; font-size: 13px;
+    background: rgba(0,0,0,0.5);
+    padding: 6px 14px; border-radius: 999px;
+    max-width: 80vw; text-align: center;
+  }
+
+  /* Bottom-sticky partner-logo footer — fixed to the viewport bottom with
+     a translucent backdrop. Sits above all content; hover bumps to full
+     opacity so links remain readable. Body padding-bottom keeps the chart
+     and Support cards from being hidden under it. */
+  .logos-footer {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 300;
+    background: rgba(255,255,255,0.78);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-top: 1px solid rgba(15,23,42,0.08);
+    box-shadow: 0 -4px 14px rgba(15,23,42,0.06);
+    padding: 8px 14px;
+    opacity: 0.85;
+    transition: opacity 0.2s;
+  }
+  .logos-footer:hover { opacity: 1; }
+  .logos-footer .logos-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 22px;
+    margin: 0;
+  }
+  .logos-footer .logos-row a {
+    display: inline-flex;
+    align-items: center;
+    height: 48px;
+    transition: transform 0.15s;
+  }
+  .logos-footer .logos-row a:hover { transform: translateY(-1px); }
+  .logos-footer .logos-row img {
+    max-height: 48px;
+    max-width: 110px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+  }
+  .logos-footer .logo-hydroai img {
+    max-height: 60px;
+    max-width: 140px;
+  }
+  body { padding-bottom: 80px; }      /* leave room above the sticky footer */
+  @media (max-width: 900px) {
+    .logos-footer { padding: 6px 8px; }
+    .logos-footer .logos-row { gap: 12px; }
+    .logos-footer .logos-row a { height: 36px; }
+    .logos-footer .logos-row img { max-height: 36px; max-width: 80px; }
+    .logos-footer .logo-hydroai img { max-height: 44px; max-width: 100px; }
+    body { padding-bottom: 60px; }
+  }
+  /* tabs */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--surface);
+    padding: 4px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    width: fit-content;
+  }
+  .tab {
+    background: transparent;
+    color: var(--muted-on-light);
+    border: none;
+    padding: 9px 20px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    transition: all .15s ease;
+  }
+  .tab.active {
+    background: var(--panel);
+    color: #fff;
+  }
+  .tab:hover:not(.active) {
+    background: rgba(15,23,42,0.06);
+    color: var(--text);
+  }
+  /* Support tab accent — heart in red, slight pop */
+  .tab.tab-support             { color: #b91c1c; }
+  .tab.tab-support:hover:not(.active) { color: #991b1b; background: rgba(185,28,28,0.08); }
+  .tab.tab-support.active      { background: #b91c1c; color: #fff; }
+
+  /* Inline ♥ Donate link in the credit area */
+  .credit-donate {
+    color: #b91c1c; font-weight: 600; text-decoration: none;
+    padding: 2px 8px; border-radius: 999px;
+    border: 1px solid rgba(185,28,28,0.3);
+    background: rgba(185,28,28,0.06);
+    transition: background 0.15s;
+  }
+  .credit-donate:hover { background: rgba(185,28,28,0.15); }
+
+  /* Support side panel — highlighted hero card + CTA. Important: stack the
+     red tint over the dark panel background so the dark theme is preserved
+     and the white text stays legible. */
+  #side-support .card.support-hero {
+    border-left: 4px solid #b91c1c;
+    background:
+      linear-gradient(180deg, rgba(185,28,28,0.22), rgba(185,28,28,0) 70%),
+      var(--panel);
+  }
+  #side-support .card.support-cta {
+    border: 1px solid rgba(185,28,28,0.55);
+    background:
+      linear-gradient(180deg, rgba(185,28,28,0.18), rgba(185,28,28,0.05) 80%),
+      var(--panel);
+  }
+  #side-support .support-mail {
+    display: inline-block; margin: 6px 0;
+    color: #fff; background: #b91c1c;
+    padding: 8px 14px; border-radius: 8px;
+    text-decoration: none; font-weight: 600;
+  }
+  #side-support .support-mail:hover { background: #991b1b; }
+  #side-support h4 { margin-bottom: 6px; color: #fff; text-transform: none; font-size: 14px; }
+  #side-support p, #side-support ul, #side-support li { color: var(--panel-text); }
+  #side-support b { color: #fff; }
+  /* layout */
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 14px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+  }
+  .map-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+  #map {
+    width: 100%;
+    height: 580px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: #ffffff;       /* shows through when Aerial imagery is off */
+  }
+  .map-controls {
+    background: var(--panel);
+    color: var(--panel-text);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 13px;
+  }
+  .map-controls .row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+  .map-controls input[type="date"],
+  .map-controls select {
+    padding: 5px 8px;
+    border: 1px solid var(--border-dark);
+    border-radius: 5px;
+    font-size: 12px;
+    background: var(--panel-2);
+    color: #fff;
+    font-family: inherit;
+  }
+  .map-controls input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.8);
+    cursor: pointer;
+  }
+  .map-controls .overlay-info {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .map-controls .layer-row label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border-dark);
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background .12s ease, border-color .12s ease;
+  }
+  .map-controls .layer-row label:hover {
+    background: rgba(255,255,255,0.10);
+    border-color: var(--accent);
+  }
+  .map-controls .layer-row label.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .map-controls input[type="checkbox"] { accent-color: var(--accent); }
+  .map-controls input[type="range"] { accent-color: var(--accent); }
+  .colorbars {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .colorbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .cb-prefix {
+    min-width: 110px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .cb-min, .cb-max { min-width: 28px; text-align: right; }
+  .cb-max { text-align: left; min-width: 60px; }
+  .cb-gradient {
+    flex: 1;
+    height: 12px;
+    border-radius: 2px;
+  }
+  .cb-rgb-note {
+    font-style: italic;
+    color: var(--muted);
+  }
+  /* right panel */
+  .side {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .stats-card { padding: 12px 14px; }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .stats-cell {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 6px;
+    padding: 8px 6px;
+    text-align: center;
+  }
+  .stats-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+  .stats-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+  }
+  .stats-hint {
+    margin-top: 10px;
+    font-size: 11px; line-height: 1.55;
+    color: var(--muted);
+  }
+  .stats-hint b { color: var(--panel-text); font-weight: 600; }
+  .stats-hint code { font-size: 10px; color: var(--panel-text); }
+  .station-id {
+    text-align: center;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    padding: 6px 0;
+  }
+  .row2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .card {
+    background: var(--panel);
+    color: var(--panel-text);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    min-height: 110px;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .card h4 {
+    margin: 0 0 8px 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  .ts-card {
+    background: var(--panel);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+  }
+  #chart { width: 100%; height: 360px; background: #fff; border-radius: 5px; }
+  .chart-msg { display:flex; align-items:center; justify-content:center; height:100%; color:var(--muted-on-light); font-size:13px; }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    padding: 6px 2px;
+  }
+  .controls label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    background: var(--surface);
+    color: var(--text);
+    padding: 5px 10px 5px 8px;
+    border-radius: 5px;
+    border-left: 4px solid currentColor;
+    border-top: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .12s ease, transform .08s ease;
+  }
+  .controls label:hover { transform: translateY(-1px); }
+  .controls input[type="checkbox"] { accent-color: currentColor; }
+  .date-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 13px;
+    color: var(--muted-on-light);
+  }
+  .date-row input {
+    padding: 5px 8px;
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .photos {
+    background: var(--panel);
+    color: #fff;
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+  }
+  .photos h4 {
+    margin: 0 0 10px 0;
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  .photo-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  .photo-grid figure {
+    margin: 0;
+    background: var(--panel-2);
+    border-radius: 5px;
+    overflow: hidden;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    color: #6e8a99;
+    font-size: 11px;
+  }
+  .photo-grid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .photo-grid figcaption { font-size: 10px; padding-top: 4px; color: var(--muted); }
+  .actions {
+    display: flex;
+    gap: 10px;
+  }
+  .btn {
+    flex: 1;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    cursor: pointer;
+    transition: background .12s ease, transform .08s ease, box-shadow .12s ease;
+    box-shadow: var(--shadow-sm);
+  }
+  .btn:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+  .btn-secondary {
+    background: var(--panel);
+  }
+  .btn-secondary:hover {
+    background: var(--panel-2);
+  }
+  .placeholder-tab {
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--muted-on-light);
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px dashed var(--border-strong);
+  }
+  /* L-band calendar (UAVs tab) — kept compact so it doesn't dominate the side */
+  .lband-cal-controls {
+    display: flex; align-items: center; gap: 4px; margin-bottom: 6px;
+    max-width: 280px;          /* match .lband-cal so controls align to grid */
+  }
+  /* explicit white (var(--text) was getting overridden inside the card on
+     dark theme, leaving the label invisible). flex:1 + text-align:center
+     pins ‹ to the far left of the strip and › to the right edge regardless
+     of month-name length. */
+  .lband-cal-label    {
+    flex: 1; text-align: center;
+    font-weight: 600; font-size: 13px;
+    color: #fff;
+    cursor: pointer; user-select: none;
+    padding: 2px 4px; border-radius: 4px;
+  }
+  .lband-cal-label:hover { background: rgba(255,255,255,0.06); }
+  .lband-cal-nav      { padding:2px 8px; font-size:12px; line-height:1; }
+  /* year/month picker (revealed by clicking the label) */
+  .lband-cal-picker { display:none; align-items:center; gap:4px; flex:1; }
+  /* Light-themed dropdowns: black text on white so the open option list is
+     readable on every browser/OS. */
+  .lband-cal-picker select {
+    background: #fff; color: #000;
+    border: 1px solid var(--border);
+    border-radius: 4px; padding: 2px 6px; font-size: 12px;
+    flex: 1; min-width: 0;
+  }
+  .lband-cal-picker select option { color: #000; background: #fff; }
+  .lband-cal {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    font-size: 11px;
+    max-width: 280px;
+  }
+  .lband-cal .lband-dow {
+    text-align:center; font-weight:600; color:var(--muted);
+    padding:2px 0; font-size:10px;
+  }
+  .lband-cal .lband-day {
+    height: 24px;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:3px; cursor:default;
+    color: var(--text); background: var(--surface);
+    border: 1px solid transparent;
+  }
+  .lband-cal .lband-day.lband-other { color: #ccc; }
+  .lband-cal .lband-day.lband-today { font-weight:700; outline:1px solid #888; }
+  .lband-cal .lband-day.lband-flight {
+    cursor:pointer; font-weight:600;
+    color:#7f1d1d;
+    border:1px solid #dc2626;
+    background:#fee2e2;
+  }
+  .lband-cal .lband-day.lband-flight:hover { background:#fecaca; }
+  .lband-cal .lband-day.lband-selected {
+    background:#dc2626; color:#fff; border-color:#7f1d1d;
+  }
+  .lband-row { display:flex; align-items:center; flex-wrap:wrap; gap:8px 12px; padding:4px 0; }
+  .lband-row-label { font-size:12px; color:var(--muted); min-width:60px; }
+  .lband-row label { font-size:13px; }
+  /* UAVs payload selector — horizontal pills */
+  .uav-pills {
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+  .uav-pill {
+    flex: 1 1 auto;
+    min-width: 78px;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease, border-color .15s ease, transform .1s ease;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    line-height: 1.15;
+    text-align: center;
+  }
+  .uav-pill:hover { background: rgba(255,255,255,0.05); color: #fff; border-color: #888; }
+  .uav-pill.active {
+    background: #dc2626;
+    color: #fff;
+    border-color: #b91c1c;
+    box-shadow: 0 1px 3px rgba(220,38,38,0.35);
+  }
+  .uav-pill .uav-pill-name { display:block; }
+  .uav-pill .uav-pill-sub  {
+    display:block; font-size:10px; font-weight:400;
+    color: var(--muted); margin-top: 2px;
+    letter-spacing: 0.02em;
+  }
+  .uav-pill.active .uav-pill-sub { color: rgba(255,255,255,0.85); }
+  /* Give the L-band pill (with subtitle) a bit more breathing room */
+  .uav-pill[data-payload="lband"] { flex: 2 1 auto; min-width: 130px; }
+  /* Sensor info card under the Products pills */
+  .uav-sensor-card { padding: 12px 14px; }
+  .uav-sensor-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .uav-sensor-img {
+    width: 110px;
+    max-height: 110px;
+    object-fit: contain;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.05);
+    flex: 0 0 auto;
+  }
+  .uav-sensor-text { flex: 1 1 auto; min-width: 0; }
+  .uav-sensor-name {
+    font-size: 13px; font-weight: 600;
+    color: #fff; margin-bottom: 4px;
+  }
+  .uav-sensor-desc {
+    font-size: 12px; line-height: 1.5;
+    color: var(--panel-text);
+  }
+  /* Display card: each product checkbox on its own line */
+  .uav-products-stack { display:flex; flex-direction:column; gap:4px; flex:1; min-width:0; }
+  .uav-products-stack label { font-size:13px; }
+  /* Calendar (left) + scrollable flight list (right) inside the calendar card */
+  .uav-cal-row { display:flex; gap:14px; align-items:flex-start; }
+  .uav-cal-col { flex: 0 0 280px; }
+  .uav-flight-list-col { flex: 1; min-width: 0; align-self: stretch; display:flex; flex-direction:column; }
+  .uav-flight-list-header {
+    display:flex; align-items:baseline; justify-content:space-between;
+    font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-bottom: 6px; font-weight: 700;
+  }
+  .uav-flight-count { color:#dc2626; font-size:10px; font-weight:600; }
+  .uav-flight-clear {
+    margin-left: 6px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+    color: #dc2626; background: transparent;
+    border: 1px solid rgba(220,38,38,0.45); border-radius: 999px;
+    padding: 1px 8px; cursor: pointer;
+    text-transform: uppercase;
+  }
+  .uav-flight-clear:hover     { background: rgba(220,38,38,0.12); color: #b91c1c; }
+  .uav-flight-clear:disabled  { opacity: 0.35; cursor: not-allowed; }
+  .uav-flight-list {
+    display: flex; flex-direction: column; gap: 3px;
+    overflow-y: auto;
+    max-height: 260px;
+    padding-right: 2px;
+  }
+  .uav-flight-list-empty {
+    font-size: 11px; color: var(--muted);
+    padding: 8px 10px; text-align: center;
+    border: 1px dashed var(--border); border-radius: 5px;
+  }
+  .uav-flight-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 8px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: #e5e7eb;                           /* explicit light text on dark side panel */
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1.2;
+    transition: background .12s ease, border-color .12s ease, color .12s ease;
+  }
+  .uav-flight-row:hover { background: rgba(255,255,255,0.06); border-color:#888; color:#fff; }
+  .uav-flight-row.selected {
+    background: #fee2e2;
+    color: #7f1d1d;                           /* dark-on-light when selected */
+    border-color: #dc2626;
+    font-weight: 600;
+  }
+  .uav-flight-row .uav-flight-date  { flex:1; font-variant-numeric: tabular-nums; }
+  .uav-flight-row .uav-flight-time  { font-size: 10px; opacity: 0.7; font-variant-numeric: tabular-nums; }
+  .uav-flight-row .uav-flight-check {
+    width: 12px; height: 12px;
+    border: 1.5px solid currentColor;
+    border-radius: 3px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .uav-flight-row.selected .uav-flight-check {
+    background: #dc2626; border-color: #7f1d1d;
+  }
+  .uav-flight-row.selected .uav-flight-check::after {
+    content: "✓";
+    position: absolute;
+    top: -3px; left: 1px;
+    font-size: 11px;
+    line-height: 1;
+    color: #fff;
+  }
+  /* footer logo strip */
+  .logos {
+    margin-top: 28px;
+    padding: 22px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+  }
+  .logos-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 36px;
+    flex-wrap: wrap;
+  }
+  .logos-row a, .logos-row .logo-slot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 56px;
+    min-width: 60px;
+    text-decoration: none;
+  }
+  .logos-row img {
+    max-height: 56px;
+    max-width: 140px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    filter: grayscale(60%);
+    opacity: 0.85;
+    transition: filter .15s ease, opacity .15s ease, transform .15s ease;
+  }
+  /* HydroAI is the host lab — bigger and always full color */
+  .logos-row .logo-hydroai { height: 88px; min-width: 120px; }
+  .logos-row .logo-hydroai img {
+    max-height: 88px;
+    max-width: 220px;
+    filter: none;
+    opacity: 1;
+  }
+  .logos-row a:hover img {
+    filter: grayscale(0%);
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+  .logo-slot.logo-missing {
+    color: #888;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1.5px dashed #c0c6cc;
+    border-radius: 4px;
+    padding: 0 14px;
+    height: 56px;
+  }
+  @media (max-width: 700px) {
+    .logos-row { gap: 18px; }
+    .logos-row img { max-height: 40px; max-width: 90px; }
+    .logos-row a, .logos-row .logo-slot { height: 40px; }
+    .logos-row .logo-hydroai { height: 60px; min-width: 90px; }
+    .logos-row .logo-hydroai img { max-height: 60px; max-width: 150px; }
+  }
+  /* satellite raster (MODIS) — show actual pixel grid (no browser smoothing).
+     The pane container holds <img> elements; nearest-neighbor scaling keeps
+     500-m / 1-km MODIS pixels crisp instead of blurred. */
+  /* L-band imagery: render as discrete grid cells (no browser smoothing).
+     Applied per-overlay via className so it doesn't affect the regular UAV
+     RGB / TIR / NDVI photos that benefit from smoothing. */
+  .leaflet-pane img.lband-overlay {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    image-rendering: -moz-crisp-edges;
+  }
+  .leaflet-pane.pane-pixelated img {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    image-rendering: -moz-crisp-edges;
+  }
+  /* leaflet station markers */
+  .station-dot {
+    background: #1f8fff;
+    border: 2px solid #0a3a72;
+    border-radius: 50%;
+    width: 14px;
+    height: 14px;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.2);
+    cursor: pointer;
+  }
+  .station-dot.selected {
+    background: #f59e0b;
+    border-color: #78350f;
+    width: 18px;
+    height: 18px;
+    box-shadow: 0 0 0 2px rgba(245,158,11,0.35);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- TOP BAR: tabs on the left, credit on the right -->
+  <div class="top-bar">
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-tab="insitu">In-situ</button>
+      <button class="tab" data-tab="uav">UAVs</button>
+      <button class="tab" data-tab="sat">Satellites</button>
+      <button class="tab" data-tab="model">Models</button>
+      <button class="tab" data-tab="ai">AI prediction</button>
+      <button class="tab" data-tab="pic">Visitor History</button>
+      <button class="tab tab-support" data-tab="support" title="Help us extend the cal/val site">♥ Support</button>
+    </div>
+    <div class="credit">
+      Website developed by <b>Hyunglok Kim</b>, PI
+      &nbsp;·&nbsp;
+      <a href="#" class="credit-donate" id="creditDonateLink" title="Help us extend the cal/val site">♥ Donate</a>
+    </div>
+  </div>
+
+  <!-- IN-SITU LAYOUT -->
+  <div class="layout" id="view-insitu">
+    <!-- Visitor History gallery main column (replaces the map+chart column
+         when the Visitor History tab is active). -->
+    <div class="map-col" id="picMainCol" style="display:none;">
+      <div class="pic-gallery-header">
+        <h3 id="picGalleryTitle">Visitor History</h3>
+        <div id="picGallerySubtitle" class="pic-gallery-subtitle">Pick a visit on the right to view the photo set.</div>
+      </div>
+      <div id="picGallery" class="pic-gallery">
+        <div class="pic-gallery-empty">No folder selected.</div>
+      </div>
+    </div>
+    <div class="map-col" id="mapCol">
+      <div id="map"></div>
+
+      <div class="map-controls">
+        <div class="row">
+          <label class="date-label">
+            Overlay date:
+            <input type="date" id="overlayDate" />
+          </label>
+          <span class="overlay-info" id="overlayInfo">—</span>
+        </div>
+        <div class="row layer-row">
+          <label><input type="checkbox" id="layerStations" checked /> Station dots colored by SM</label>
+          <label>
+            <input type="checkbox" id="layerUAV" /> UAV
+            <select id="uavProduct" title="UAV product">
+              <option value="rgb">Multispectral RGB (1 m)</option>
+              <option value="tir">TIR (1 m, °C)</option>
+              <option value="ndvi">NDVI (1 m)</option>
+              <option value="ndwi">NDWI (1 m)</option>
+              <option value="lidar">LiDAR DSM (1 m)</option>
+              <option value="sm_retr">L-band SM retrieved (25 m, m³/m³)</option>
+              <option value="sm_lgb">L-band SM downscaled (1 m, m³/m³)</option>
+              <option value="tb_v">L-band TBv (25 m, K)</option>
+              <option value="tb_h">L-band TBh (25 m, K)</option>
+            </select>
+            <input type="range" id="uavOpacity" min="0" max="100" value="80"
+                   title="UAV opacity"
+                   style="width:60px;height:12px;margin-left:6px;vertical-align:middle;">
+            <span id="uavOpacityVal" style="font-size:11px;color:var(--muted);">80%</span>
+            <input type="checkbox" id="uavInterpolate" title="Interpolate UAV pixels (off = show actual pixel grid)" style="margin-left:6px;">
+            <span style="font-size:11px;color:var(--muted);">interpolate</span>
+          </label>
+          <label>
+            <input type="checkbox" id="layerSat" /> Satellite
+            <select id="satProduct" title="Satellite product (source + variable)">
+              <option value="hls:ndvi">HLS NDVI (30 m, 2–3 day)</option>
+              <option value="landsat:lst">Landsat LST (30 m, 8-day, °C)</option>
+              <option value="modis:ndvi">MODIS NDVI (500 m, 16-day)</option>
+              <option value="modis:lst">MODIS LST (1 km, 8-day, °C)</option>
+            </select>
+            <input type="range" id="satOpacity" min="0" max="100" value="80"
+                   title="Satellite opacity"
+                   style="width:60px;height:12px;margin-left:6px;vertical-align:middle;">
+            <span id="satOpacityVal" style="font-size:11px;color:var(--muted);">80%</span>
+            <input type="checkbox" id="satInterpolate" title="Interpolate satellite pixels (off = show actual pixel grid)" style="margin-left:6px;">
+            <span style="font-size:11px;color:var(--muted);">interpolate</span>
+          </label>
+          <label>
+            <input type="checkbox" id="layerNisar" /> NISAR (200 m)
+            <select id="nisarProduct" title="NISAR variable">
+              <option value="sm">SM Beta (m³/m³)</option>
+              <option value="gist_sm">GIST SM Beta (m³/m³)</option>
+              <option value="hh">HH backscatter (linear)</option>
+              <option value="hv">HV backscatter (linear)</option>
+              <option value="lia">Local Incidence Angle (°)</option>
+            </select>
+            <input type="range" id="nisarOpacity" min="0" max="100" value="80"
+                   title="NISAR opacity"
+                   style="width:60px;height:12px;margin-left:6px;vertical-align:middle;">
+            <span id="nisarOpacityVal" style="font-size:11px;color:var(--muted);">80%</span>
+          </label>
+          <label class="disabled" title="SMAP not yet wired — will activate when data is added"><input type="checkbox" disabled /> SMAP (1 km, future)</label>
+        </div>
+        <div class="row layer-row">
+          <label><input type="checkbox" id="layerImagery" checked /> Aerial imagery (Esri)</label>
+          <label>
+            Basemap:
+            <select id="basemapSelect">
+              <option value="">— none —</option>
+            </select>
+          </label>
+          <label>
+            Opacity:
+            <input type="range" id="basemapOpacity" min="0" max="100" value="65" style="width:100px;">
+            <span id="basemapOpacityVal" style="font-size:11px;color:var(--muted);">65%</span>
+          </label>
+        </div>
+        <div class="colorbars" id="colorbars"></div>
+      </div>
+    </div>
+
+    <div class="side" id="side-insitu">
+      <!-- Network stats — populated after stations + per-station timeseries
+           checks complete. "Total" is the planned sensor count from
+           stations.csv (depths_cm × 2 + precipitation); "Active" counts
+           timeseries columns that currently have data. The gap is sensors
+           that are catalogued but not yet streaming data. -->
+      <div class="card stats-card" id="statsCard">
+        <h4 style="margin-top:0;">Network</h4>
+        <div class="stats-grid">
+          <div class="stats-cell">
+            <div class="stats-label">Stations</div>
+            <div class="stats-value" id="statTotalStations">—</div>
+          </div>
+          <div class="stats-cell">
+            <div class="stats-label">Sensors (planned)</div>
+            <div class="stats-value" id="statTotalSensors">—</div>
+          </div>
+          <div class="stats-cell">
+            <div class="stats-label">Sensors (live)</div>
+            <div class="stats-value" id="statActiveSensors">—</div>
+          </div>
+        </div>
+        <div class="stats-hint">
+          <b>Planned</b> is the catalogued count from <code>stations.csv</code>
+          (sensors per depth + precipitation).
+          <b>Live</b> counts sensors whose timeseries currently has data — the
+          gap is hardware not yet streaming.
+        </div>
+      </div>
+
+      <div class="station-id" id="stationLabel">Station ID (-)</div>
+
+      <div class="row2">
+        <div class="card">
+          <h4>Station information</h4>
+          <div id="stationInfo">Click a station on the map.</div>
+        </div>
+        <div class="card">
+          <h4>Station note / updates</h4>
+          <div id="stationNotes">-</div>
+        </div>
+      </div>
+
+      <div class="ts-card">
+        <div id="chart"></div>
+        <div id="sceneStrip" style="height:90px;margin-top:4px;cursor:pointer;"></div>
+        <div style="font-size:10px;color:var(--muted);text-align:right;margin-top:2px;">
+          Click a red dot to jump the Overlay date to that scene.
+        </div>
+      </div>
+
+      <div class="controls" id="varList">
+        <span style="color:#888;font-size:12px;">Variables will load from the CSV header.</span>
+      </div>
+
+      <div class="date-row">
+        <span>Period:</span>
+        <input type="date" id="dateStart" />
+        <span>—</span>
+        <input type="date" id="dateEnd" />
+        <button class="btn" style="flex:0;padding:6px 12px;font-size:13px;" id="applyDate">Apply</button>
+      </div>
+
+      <div class="photos">
+        <h4>Station's installation</h4>
+        <div class="photo-grid" id="photoGrid">
+          <figure><span>installation</span></figure>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn" id="downloadOne">Download this station's data</button>
+        <button class="btn btn-secondary" id="downloadAll">Bulk download (all stations)</button>
+      </div>
+    </div>
+
+    <!-- UAVs side panel: separate Payload + Calendar cards -->
+    <div class="side" id="side-uav" style="display:none;">
+      <div class="station-id">UAVs flights</div>
+
+      <!-- Card 1: Products selector -->
+      <div class="card">
+        <h4 style="margin-top:0;">Products</h4>
+        <div class="uav-pills" id="uavPayloadPills">
+          <button class="uav-pill active" data-payload="lband" type="button">
+            <span class="uav-pill-name">L-band Radiometer</span>
+            <span class="uav-pill-sub">TB · Soil Moisture</span>
+          </button>
+          <button class="uav-pill" data-payload="rgb"   type="button"><span class="uav-pill-name">RGB</span></button>
+          <button class="uav-pill" data-payload="tir"   type="button"><span class="uav-pill-name">Thermal</span></button>
+          <button class="uav-pill" data-payload="lidar" type="button"><span class="uav-pill-name">LiDAR</span></button>
+          <button class="uav-pill" data-payload="ndvi"  type="button"><span class="uav-pill-name">NDVI</span></button>
+          <button class="uav-pill" data-payload="ndwi"  type="button"><span class="uav-pill-name">NDWI</span></button>
+        </div>
+      </div>
+
+      <!-- Sensor info card — refreshed by setUavPayload() to show the photo
+           and spec text for whichever product pill is active. -->
+      <div class="card uav-sensor-card" id="uavSensorCard">
+        <div class="uav-sensor-row">
+          <img id="uavSensorImg" class="uav-sensor-img" src="photos/sensors/UAV_polra_L_band.png" alt="">
+          <div class="uav-sensor-text">
+            <div class="uav-sensor-name" id="uavSensorName">TerraRad L-band radiometer</div>
+            <div class="uav-sensor-desc" id="uavSensorDesc">PolRA — passive L-band microwave radiometer measuring V- and H-pol brightness temperature for soil-moisture retrievals at the cal/val site.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Flight calendar (left) + chronological flight list (right) -->
+      <div class="card">
+        <h4 id="uavPayloadTitle" style="margin-top:0;">L-band Radiometer (TB; Soil Moisture)</h4>
+        <div class="uav-cal-row">
+          <div class="uav-cal-col">
+            <div class="lband-cal-controls">
+              <button class="btn btn-secondary lband-cal-nav" id="lbandCalPrev"  type="button">‹</button>
+              <span id="lbandCalLabel" class="lband-cal-label" title="Click to change month/year">—</span>
+              <div id="lbandCalPicker" class="lband-cal-picker">
+                <select id="lbandCalMonthSel"></select>
+                <select id="lbandCalYearSel"></select>
+              </div>
+              <button class="btn btn-secondary lband-cal-nav" id="lbandCalNext"  type="button">›</button>
+              <button class="btn btn-secondary lband-cal-nav" id="lbandCalToday" type="button">Today</button>
+            </div>
+            <div id="lbandCalendar" class="lband-cal"></div>
+            <div id="lbandCalHint" style="font-size:11px;color:var(--muted);margin-top:6px;">
+              Red-filled days have a flight. Click to add/remove from the map.
+            </div>
+          </div>
+          <div class="uav-flight-list-col">
+            <div class="uav-flight-list-header">
+              <span>All flights</span>
+              <span id="uavFlightSelectedCount" class="uav-flight-count">0 selected</span>
+              <button type="button" id="uavClearSelections" class="uav-flight-clear" title="Remove all selected flights from the map">Clear</button>
+            </div>
+            <div id="uavFlightList" class="uav-flight-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="lbandFlightCard">
+        <h4>Selected flight</h4>
+        <div id="lbandFlightInfo" style="font-size:13px;color:var(--muted);">Pick a date with a flight.</div>
+      </div>
+
+      <!-- PolRA data selector (shown only when lband payload is active and
+           we're in catalog.csv-fallback mode — i.e. PolRA NCs, no patches). -->
+      <div class="card" id="polraSelectorCard" style="display:none;">
+        <h4>Data</h4>
+        <div class="lband-row">
+          <label><input type="radio" name="polraProduct" value="sm_retr" checked> SM retrieved (25 m, m³/m³)</label>
+          <label><input type="radio" name="polraProduct" value="sm_lgb"> SM downscaled (1 m, m³/m³)</label>
+          <label><input type="radio" name="polraProduct" value="tb_v"> TB<sub>V</sub> (25 m, K)</label>
+          <label><input type="radio" name="polraProduct" value="tb_h"> TB<sub>H</sub> (25 m, K)</label>
+        </div>
+      </div>
+
+      <!-- Downloads for the UAVs tab: PNGs of currently-selected overlays
+           (direct), and a mailto for full raw NC files. -->
+      <div class="card" id="uavDownloadCard">
+        <h4>Downloads</h4>
+        <button class="btn" id="uavDownloadSelected" style="width:100%;margin-bottom:6px;">
+          Download selected overlays (PNG)
+        </button>
+        <button class="btn btn-secondary" id="uavRequestRaw" style="width:100%;">
+          Request raw NC files (email)
+        </button>
+        <div id="uavDownloadHint" style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.45;">
+          PNG download saves the same georeferenced overlays you see on the
+          map (one file per active selection). Raw NC requests are sent by
+          email so we can package the right resolution and metadata.
+        </div>
+      </div>
+
+      <div class="card" id="lbandCalibCard" style="display:none;">
+        <h4>Calibration (per flight)</h4>
+        <div id="lbandCalibBody" style="font-size:12px;color:var(--muted);">
+          Sky / microwave-absorber calibration plots will appear here per
+          selected flight (placeholder).
+        </div>
+      </div>
+
+      <div class="card" id="lbandSelectorCard" style="display:none;">
+        <h4>Display</h4>
+        <div class="lband-row">
+          <span class="lband-row-label">Variable:</span>
+          <label><input type="radio" name="lbandVar" value="TB_V" checked> TB<sub>V</sub> (K)</label>
+          <label><input type="radio" name="lbandVar" value="TB_H"> TB<sub>H</sub> (K)</label>
+          <label><input type="radio" name="lbandVar" value="SM"> SM (m³/m³)</label>
+        </div>
+        <div class="lband-row">
+          <span class="lband-row-label">Products:</span>
+          <div class="uav-products-stack">
+            <label><input type="checkbox" id="lbandShowRaw"   checked> Raw flight path (locations only)</label>
+            <label><input type="checkbox" id="lbandShow30cm"  checked> 30 cm resolution (DL-model)</label>
+            <label><input type="checkbox" id="lbandShow10m">          10 m resolution (original)</label>
+            <label><input type="checkbox" id="lbandShow200m">         200 m resolution (upscaled)</label>
+          </div>
+        </div>
+        <div class="lband-row">
+          <span class="lband-row-label">Opacity:</span>
+          <input type="range" id="lbandOpacity" min="0" max="100" value="80" style="flex:1;">
+          <span id="lbandOpacityVal" style="font-size:11px;color:var(--muted);">80%</span>
+        </div>
+        <div class="lband-row" id="lbandLegendRow" style="margin-top:6px;">
+          <span class="lband-row-label">Legend:</span>
+          <div id="lbandLegend" class="colorbar" style="flex:1;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Other tabs: stub side panels -->
+    <div class="side" id="side-sat" style="display:none;">
+      <div class="card"><h4>Satellites</h4><div>Per-source views coming soon. Use the map's Satellite layer toggle for now.</div></div>
+    </div>
+    <div class="side" id="side-model" style="display:none;">
+      <div class="card"><h4>Models</h4><div>Model output viewer coming soon.</div></div>
+    </div>
+    <div class="side" id="side-ai" style="display:none;">
+      <div class="card"><h4>AI prediction</h4><div>AI prediction viewer coming soon.</div></div>
+    </div>
+
+    <!-- Visitor History gallery -->
+    <div class="side" id="side-pic" style="display:none;">
+      <div class="card">
+        <h4 style="margin-top:0;">Visits</h4>
+        <div id="picFolderList" class="pic-folder-list">
+          <div class="pic-folder-empty">Loading…</div>
+        </div>
+      </div>
+      <div class="card">
+        <h4>About</h4>
+        <p style="font-size:12px;line-height:1.55;color:var(--panel-text);">
+          A record of lab tours, partner-agency visits, and field campaigns
+          at the Hampyeong cal/val site. Click a visit on the left to view
+          its photo set.
+        </p>
+      </div>
+    </div>
+
+    <!-- Support / Donation -->
+    <div class="side" id="side-support" style="display:none;">
+      <div class="card support-hero">
+        <h4 style="margin-top:0;">Support the Hampyeong Cal/Val Site</h4>
+        <p style="font-size:13px;line-height:1.6;">
+          The Hampyeong site is a community-funded cal/val effort run by the
+          <b>HydroAI lab</b>. Every contribution goes <b>100% toward in-situ
+          sensors and data loggers</b> deployed in the field — not overhead, not
+          travel, not salaries. Your support directly grows the network of
+          measurements that anchor satellite missions to ground truth.
+        </p>
+      </div>
+
+      <div class="card">
+        <h4>Our vision</h4>
+        <p style="font-size:13px;line-height:1.65;">
+          We are building the world's reference site for validating future
+          satellite missions — at the <b>highest spatial resolution</b> and the
+          <b>highest measurement quality</b> ever assembled for soil-moisture
+          cal/val. From microwave radiometry and SAR backscatter to optical and
+          thermal retrievals, every product that flies overhead deserves
+          measurements rich and precise enough to trust against. Hampyeong is
+          where we make that trust quantifiable.
+        </p>
+      </div>
+
+      <div class="card">
+        <h4>Roadmap: 1 km → 9 km → 36 km</h4>
+        <p style="font-size:13px;line-height:1.65;">
+          We instrument in stages, each anchored to the EASE-Grid 2.0 cells
+          used by NASA SMAP and partner missions:
+        </p>
+        <ul style="font-size:13px;line-height:1.65;padding-left:18px;margin:6px 0;">
+          <li><b>Stage 1 — 1 km cell (current)</b>: 50 stations, UAV LiDAR /
+              multispectral / TIR / L-band radiometer, NISAR-class SAR.</li>
+          <li><b>Stage 2 — 9 km cell</b>: extend the in-situ network ninefold to
+              match SMAP's native footprint.</li>
+          <li><b>Stage 3 — 36 km cell</b>: scale to the full SMAP composite scale,
+              becoming a turnkey reference for any current or future
+              soil-moisture / land-surface mission.</li>
+        </ul>
+        <p style="font-size:13px;line-height:1.65;">
+          Each stage is sensor-bound — every donation buys real hardware that
+          stays in the field.
+        </p>
+      </div>
+
+      <div class="card">
+        <h4>What you get back</h4>
+        <ul style="font-size:13px;line-height:1.65;padding-left:18px;margin:6px 0;">
+          <li><b>Quarterly progress reports</b>: deployments, retrievals,
+              new datasets, and how your donation was used.</li>
+          <li><b>Acknowledgement in research outputs</b>: any peer-reviewed
+              paper, conference presentation, or dataset release that uses
+              Hampyeong data will credit donors who consent.</li>
+          <li><b>Early access</b> to Hampyeong-derived products as they come
+              online.</li>
+        </ul>
+      </div>
+
+      <div class="card support-cta">
+        <h4>How to contribute</h4>
+        <p style="font-size:13px;line-height:1.65;">
+          To donate or to discuss in-kind contributions (sensors, loggers,
+          field time), please reach out directly:
+        </p>
+        <p style="font-size:14px;line-height:1.7;text-align:center;">
+          <a href="mailto:hyunglokkim@gmail.com?subject=Hampyeong%20cal%2Fval%20donation"
+             class="support-mail">hyunglokkim@gmail.com</a>
+        </p>
+        <p style="font-size:12px;color:var(--muted);line-height:1.6;">
+          — Hyunglok Kim, PI, HydroAI lab
+        </p>
+      </div>
+    </div>
+  </div>
+
+
+</div>
+
+<!-- Lightbox for the Pictures tab — click any thumbnail to open. -->
+<div id="picLightbox" class="pic-lightbox" style="display:none;" role="dialog" aria-modal="true">
+  <button id="picLbClose" class="pic-lb-btn pic-lb-close" title="Close (Esc)">×</button>
+  <button id="picLbPrev"  class="pic-lb-btn pic-lb-prev"  title="Previous (←)">‹</button>
+  <img id="picLbImg" class="pic-lb-img" src="" alt="">
+  <button id="picLbNext"  class="pic-lb-btn pic-lb-next"  title="Next (→)">›</button>
+  <div id="picLbCaption" class="pic-lb-caption"></div>
+</div>
+
+<!-- Sticky partner-logo footer — fixed to the bottom of the viewport with a
+     translucent backdrop so it stays visible across scroll/tabs without
+     blocking the content underneath. -->
+<footer class="logos-footer" aria-label="Partner organizations">
+  <div class="logos-row">
+    <a href="https://hydroai.net" target="_blank" rel="noopener" class="logo-hydroai" title="HydroAI"><img src="logos/hydroai.png" alt="HydroAI"></a>
+    <a href="https://www.gist.ac.kr/kr/main.html" target="_blank" rel="noopener" title="GIST"><img src="logos/GIST.png" alt="GIST"></a>
+    <a href="https://www.jpl.nasa.gov" target="_blank" rel="noopener" title="NASA JPL"><img src="logos/JPL.png" alt="NASA JPL"></a>
+    <a href="https://www.nasa.gov/goddard" target="_blank" rel="noopener" title="NASA GSFC"><img src="logos/GSFC.png" alt="NASA GSFC"></a>
+    <a href="https://smap.jpl.nasa.gov" target="_blank" rel="noopener" title="NASA SMAP"><img src="logos/SMAP.png" alt="NASA SMAP"></a>
+    <a href="https://en.ilmatieteenlaitos.fi" target="_blank" rel="noopener" title="FMI"><img src="logos/FMI.png" alt="FMI"></a>
+    <a href="https://www.mit.edu" target="_blank" rel="noopener" title="MIT"><img src="logos/MIT.png" alt="MIT"></a>
+  </div>
+</footer>
+
+<script>
+// =============================================================
+// Config — change these if your file paths differ
+// =============================================================
+const STATIONS_CSV = "data/stations.csv";
+const TS_DIR     = "data/timeseries_hourly";   // 1-h aggregates used by the chart
+const TS_DIR_RAW = "data/timeseries";          // 5-min source data (download only)
+const PHOTO_DIR = "photos";         // {station_id}_{season}.jpg
+
+// =============================================================
+// Map setup — Leaflet + Esri World Imagery basemap
+// (Replace with your own LULC tile layer when ready: see addLulcOverlay())
+// =============================================================
+// Real EASE-Grid 2.0 1-km cell center (derived from data/grid/Gridlines_M200M.kml)
+const SITE_CENTER = [35.015074737786415, 126.55082987551783];
+
+// Initial zoom is intentionally a touch wide; fitBounds() below tightens
+// the view to the actual 1-km cell once Cells_M01.kml loads.
+const map = L.map("map", { zoomControl: true }).setView(SITE_CENTER, 15);
+
+// Aerial imagery is a single tile layer that the user can toggle off — when
+// off, the leaflet container's white background shows through so only the
+// KML grid + station markers + overlays remain (positional reference only).
+const imageryLayer = L.tileLayer(
+  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  { attribution: "Esri World Imagery", maxZoom: 22 }
+).addTo(map);
+document.getElementById("layerImagery").addEventListener("change", e => {
+  if (e.target.checked) imageryLayer.addTo(map);
+  else                  map.removeLayer(imageryLayer);
+});
+
+// =============================================================
+// Custom panes — fixes the z-order so station markers (default
+// markerPane @ z 600) are ALWAYS on top, KML grid lines sit above
+// all raster overlays, and rasters stack predictably:
+//   basemap (LULC / DEM) → satellite (MODIS) → UAV → grid lines → stations
+// =============================================================
+map.createPane("basemapPane").style.zIndex   = 350;
+const _satPane = map.createPane("satellitePane");
+_satPane.style.zIndex = 360;
+_satPane.classList.add("pane-pixelated");        // default: crisp MODIS pixels
+const _uavPane = map.createPane("uavPane");
+_uavPane.style.zIndex = 370;
+_uavPane.classList.add("pane-pixelated");        // default: crisp UAV pixels (matters for 25 m L-band SM)
+map.createPane("gridPane").style.zIndex      = 380;
+// markers stay in the default markerPane (z 600) → above everything raster
+
+// =============================================================
+// EASE-Grid 2.0 nested grids — single lab-supplied KML, but only the cell
+// containing the Hampyeong site center is drawn at each scale (one
+// rectangle per scale, nested 1 km → 3 km → 9 km → 36 km).
+//   data/grid/nested_grids_200m_1km_3km_9km_36km.kml
+// Each folder in the KML stores row + col grid lines (e.g. "L2SMSP 9 km
+// row 12", "L2SMSP 9 km col 7"). We extract the row latitudes and column
+// longitudes, find the four lines bracketing SITE_CENTER, and assemble
+// just that one cell as a rectangle.
+// =============================================================
+async function loadNestedGridKML(url, folderStyles) {
+  const text = await (await fetch(url)).text();
+  const dom  = new DOMParser().parseFromString(text, "text/xml");
+  const out  = {};
+  const [siteLat, siteLon] = SITE_CENTER;
+
+  for (const f of dom.getElementsByTagName("Folder")) {
+    const folderName = f.getElementsByTagName("name")[0]?.textContent.trim() || "";
+    const style = folderStyles[folderName];
+    if (!style) continue;
+
+    // Each row placemark = horizontal line at fixed lat; col placemark =
+    // vertical line at fixed lon. Sample the first coordinate of each.
+    const rowLats = new Set(), colLons = new Set();
+    for (const pm of f.getElementsByTagName("Placemark")) {
+      const pmName  = pm.getElementsByTagName("name")[0]?.textContent || "";
+      const coords  = pm.getElementsByTagName("coordinates")[0]?.textContent?.trim();
+      if (!coords) continue;
+      const first = coords.split(/\s+/)[0].split(",").map(Number);   // [lon, lat, alt]
+      if (/\brow\b/i.test(pmName))      rowLats.add(first[1]);
+      else if (/\bcol\b/i.test(pmName)) colLons.add(first[0]);
+    }
+    const lats = [...rowLats].sort((a, b) => a - b);
+    const lons = [...colLons].sort((a, b) => a - b);
+
+    // Find the bracketing lines around the site center.
+    const bot   = [...lats].reverse().find(v => v <= siteLat);
+    const top   = lats.find(v => v >= siteLat);
+    const left  = [...lons].reverse().find(v => v <= siteLon);
+    const right = lons.find(v => v >= siteLon);
+    if ([top, bot, left, right].some(v => v == null)) {
+      console.warn(`[grid] "${folderName}" — no bracketing cell around site`);
+      continue;
+    }
+
+    const ring = [[top, left], [top, right], [bot, right], [bot, left], [top, left]];
+    const layer = L.polyline(ring, { pane: "gridPane", ...style }).addTo(map);
+    out[folderName] = layer;
+  }
+  return out;
+}
+
+loadNestedGridKML("data/grid/nested_grids_200m_1km_3km_9km_36km.kml", {
+  // Only nested validation cells — not interior 200-m gridlines.
+  "L2SMSP 1 km":   { color: "#000",     weight: 2.5, opacity: 1.0  },
+  "L2SMSP 3 km":   { color: "#1d4ed8",  weight: 2.2, opacity: 0.95, dashArray: "8,4" },
+  "L2SMSP 9 km":   { color: "#b91c1c",  weight: 2.5, opacity: 0.95, dashArray: "10,6" },
+  "L2SMSP 36 km":  { color: "#a21caf",  weight: 2.8, opacity: 0.95, dashArray: "14,8" },
+}).then(layers => {
+  Object.entries(layers).forEach(([n, l]) =>
+    console.log(`[grid] "${n}" cell loaded`));
+  // Initial view zooms to the 1-km validation cell (tightest nested grid).
+  const m01 = layers["L2SMSP 1 km"];
+  if (m01) map.fitBounds(m01.getBounds(), { padding: [10, 10] });
+  // Bring the 9-km bold red ring to the top of the gridPane so it isn't
+  // hidden by the inner cells.
+  const m09 = layers["L2SMSP 9 km"];
+  if (m09) m09.bringToFront();
+}).catch(err => console.warn("KML load failure:", err));
+
+// Optional: add your own LULC raster as an image overlay
+// function addLulcOverlay() {
+//   const bounds = [[35.0613, 126.5112], [35.0721, 126.5222]];
+//   L.imageOverlay("lulc.png", bounds, { opacity: 0.6 }).addTo(map);
+// }
+// addLulcOverlay();
+
+// =============================================================
+// Variable categorisation — drives axis assignment + colors
+// Add a new pattern here if you introduce a new variable family.
+// =============================================================
+const CAT_INFO = {
+  sm:     { label: "Soil moisture",    unit: "m³/m³", reversed: false, kind: "line" },
+  temp:   { label: "Soil temperature", unit: "°C",    reversed: false, kind: "line" },
+  precip: { label: "Precipitation",    unit: "mm",    reversed: true,  kind: "bar"  },
+  other:  { label: "Other",            unit: "",      reversed: false, kind: "line" },
+};
+const PALETTE = {
+  sm:     ["#1f6fcc", "#1f8fff", "#5fa8e0", "#0a4a87", "#3a90c0"],
+  temp:   ["#f59e0b", "#c25420", "#f0a070", "#8a3a0e", "#d96030"],
+  precip: ["#2a7596", "#3aa1c2"],
+  other:  ["#9b6bd1", "#d14b6b", "#f0b820", "#3ab2c4", "#7aa15a"],
+};
+function categorize(name) {
+  const n = String(name).toLowerCase();
+  if (/(precip|rain|rainfall)/.test(n))            return "precip";
+  if (/(soil[_ ]?moist|tree[_ ]?sm|swc|theta|^sm[_ ]|_sm$|vwc)/.test(n)) return "sm";
+  if (/(temp|temperature)/.test(n))                return "temp";
+  return "other";
+}
+
+// =============================================================
+// State
+// =============================================================
+let stations = [];
+let stationMarkers = {};
+let currentStation = null;
+let currentTS = null;       // parsed timeseries rows for the selected station
+let varState = [];          // [{name, cat, color, checked}, ...]
+
+// overlay state
+let dailySM = null;         // { dates: [...], byDate: { '2025-06-01': {HP_1-1: 0.24, ...}, ... } }
+let uavCatalog = [];        // [{date, file, n,s,e,w, ...}]
+let uavLayer = null;        // current Leaflet imageOverlay
+
+// satellite (MODIS / HLS / Landsat) state — same schema as UAV catalog
+let satCatalog = [];
+let satLayer = null;
+let nisarLayer = null;       // separate from satLayer so NISAR can overlay alongside
+
+// basemap state (LULC, soil properties, etc.)
+let basemapCatalog = [];    // [{id, label, file, n,s,e,w, type, classes|colormap, ...}]
+let basemapLayer = null;
+let currentBasemap = null;  // the selected entry from basemapCatalog
+
+// =============================================================
+// Colorbar registry — one entry per scalar product. Each entry's gradient
+// must match the colormap used to bake the PNG (see generate_sample_data.py).
+// RGB has no scalar colorbar.
+// =============================================================
+const COLORBARS = {
+  sm:    { label: "Soil moisture",  unit: "m³/m³", min: 0.05, max: 0.55,
+           gradient: "linear-gradient(to right, rgb(120,60,20), rgb(220,160,60), rgb(80,170,220), rgb(20,60,160))" },
+  tir:   { label: "Thermal IR",     unit: "°C",    min: -15,  max: 50,
+           gradient: "linear-gradient(to right, rgb(15,50,130), rgb(40,130,230), rgb(120,200,200), rgb(210,230,110), rgb(255,220,60), rgb(240,130,40), rgb(200,30,30))" },
+  lst:   { label: "Land Surface Temp", unit: "°C", min: -10,  max: 45,
+           gradient: "linear-gradient(to right, rgb(15,50,130), rgb(40,130,230), rgb(120,200,200), rgb(210,230,110), rgb(255,220,60), rgb(240,130,40), rgb(200,30,30))" },
+  ndvi:  { label: "NDVI",           unit: "",      min: 0,    max: 0.9,
+           gradient: "linear-gradient(to right, rgb(120,80,40), rgb(220,200,150), rgb(200,230,140), rgb(20,100,30))" },
+  ndwi:  { label: "NDWI",           unit: "",      min: -0.5, max: 0.5,
+           gradient: "linear-gradient(to right, rgb(80,35,10), rgb(180,110,50), rgb(245,245,245), rgb(30,120,200), rgb(5,25,100))" },
+  lidar: { label: "LiDAR DSM",      unit: "m",     min: 30,   max: 80,
+           gradient: "linear-gradient(to right, rgb(30,80,30), rgb(80,160,60), rgb(220,200,80), rgb(220,130,50), rgb(200,50,40))" },
+  hh:    { label: "HH backscatter",  unit: "lin",   min: 0,    max: 0.5,
+           gradient: "linear-gradient(to right, rgb(30,80,30), rgb(80,160,60), rgb(220,200,80), rgb(220,130,50), rgb(200,50,40))" },
+  hv:    { label: "HV backscatter",  unit: "lin",   min: 0,    max: 0.3,
+           gradient: "linear-gradient(to right, rgb(30,80,30), rgb(80,160,60), rgb(220,200,80), rgb(220,130,50), rgb(200,50,40))" },
+  lia:   { label: "Incidence Angle", unit: "°",     min: 20,   max: 60,
+           gradient: "linear-gradient(to right, rgb(30,80,30), rgb(80,160,60), rgb(220,200,80), rgb(220,130,50), rgb(200,50,40))" },
+  gist_sm:{ label: "GIST Soil moisture", unit: "m³/m³", min: 0.05, max: 0.55,
+           gradient: "linear-gradient(to right, rgb(120,60,20), rgb(220,160,60), rgb(80,170,220), rgb(20,60,160))" },
+  sm_retr:{ label: "L-band SM (retrieved)", unit: "m³/m³", min: 0.05, max: 0.55,
+           gradient: "linear-gradient(to right, rgb(120,60,20), rgb(220,160,60), rgb(80,170,220), rgb(20,60,160))" },
+  sm_lgb: { label: "L-band SM (downscaled)", unit: "m³/m³", min: 0.05, max: 0.55,
+           gradient: "linear-gradient(to right, rgb(120,60,20), rgb(220,160,60), rgb(80,170,220), rgb(20,60,160))" },
+  tb_v:   { label: "L-band TBv",       unit: "K",     min: 200,  max: 280,
+           gradient: "linear-gradient(to right, rgb(15,50,130), rgb(40,130,230), rgb(120,200,200), rgb(210,230,110), rgb(255,220,60), rgb(240,130,40), rgb(200,30,30))" },
+  tb_h:   { label: "L-band TBh",       unit: "K",     min: 200,  max: 280,
+           gradient: "linear-gradient(to right, rgb(15,50,130), rgb(40,130,230), rgb(120,200,200), rgb(210,230,110), rgb(255,220,60), rgb(240,130,40), rgb(200,30,30))" },
+};
+
+// dry → wet colormap: dark brown → orange → light blue → deep blue.
+// Stays saturated through the middle (no gray) and matches the CSS legend
+// gradient + the Python cmap_sm in nc_to_overlay.py.
+function smToColor(v, vmin = 0.05, vmax = 0.55) {
+  if (v == null || isNaN(v)) return "#888";
+  const t = Math.max(0, Math.min(1, (v - vmin) / (vmax - vmin)));
+  const stops = [
+    [0.00, 120,  60,  20],
+    [0.33, 220, 160,  60],
+    [0.66,  80, 170, 220],
+    [1.00,  20,  60, 160],
+  ];
+  for (let i = 0; i < stops.length - 1; i++) {
+    const [t0, r0, g0, b0] = stops[i];
+    const [t1, r1, g1, b1] = stops[i + 1];
+    if (t <= t1) {
+      const u = (t - t0) / (t1 - t0);
+      const r = Math.round(r0 + (r1 - r0) * u);
+      const g = Math.round(g0 + (g1 - g0) * u);
+      const b = Math.round(b0 + (b1 - b0) * u);
+      return `rgb(${r},${g},${b})`;
+    }
+  }
+  return `rgb(20,60,160)`;
+}
+
+function nearestDateRow(rows, dateStr) {
+  if (!rows.length) return null;
+  const target = new Date(dateStr).getTime();
+  let best = rows[0], bd = Math.abs(new Date(rows[0].date).getTime() - target);
+  for (const r of rows) {
+    const d = Math.abs(new Date(r.date).getTime() - target);
+    if (d < bd) { best = r; bd = d; }
+  }
+  return best;
+}
+
+// =============================================================
+// Load stations.csv and put markers on the map
+// =============================================================
+Papa.parse(STATIONS_CSV, {
+  download: true,
+  header: true,
+  dynamicTyping: true,
+  skipEmptyLines: true,
+  complete: (res) => {
+    stations = res.data.filter(r => r.station_id);
+    stations.forEach(addStationMarker);
+    // default to HP_13-1 (rice paddy in the cell center) when present
+    const defaultStation = stations.find(s => s.station_id === "HP_13-1") || stations[0];
+    if (defaultStation) selectStation(defaultStation);
+    loadOverlayData();   // daily SM + UAV catalog after stations are placed
+    computeNetworkStats(stations);   // populate Network card
+  },
+  error: (err) => console.error("Failed to load stations.csv", err),
+});
+
+// Network stats: total stations / total sensors / active sensors. Total
+// sensors are estimated from each station's depths_cm column (2 × n_depths
+// for sm+temp, plus precipitation = 1). Active sensors are counted by
+// fetching each timeseries CSV and tallying columns that have at least one
+// finite reading.
+function _stationSensorCount(s) {
+  // depths_cm is like "0, 10" → 2 depths
+  const txt = String(s.depths_cm || "").trim();
+  const depths = txt ? txt.split(",").map(d => d.trim()).filter(Boolean) : [];
+  return Math.max(0, depths.length) * 2 + 1;     // sm + temp per depth + precip
+}
+
+function computeNetworkStats(stationList) {
+  const totalStations = stationList.length;
+  const totalSensors  = stationList.reduce((a, s) => a + _stationSensorCount(s), 0);
+  document.getElementById("statTotalStations").textContent = totalStations;
+  document.getElementById("statTotalSensors").textContent  = totalSensors;
+  document.getElementById("statActiveSensors").textContent = "—";
+
+  // Tally active sensors in the background. Each station's timeseries CSV
+  // is fetched, and every non-time column with at least one finite value
+  // counts as one active sensor.
+  let activeSensors = 0;
+  let pending = stationList.length;
+  if (pending === 0) { document.getElementById("statActiveSensors").textContent = 0; return; }
+
+  stationList.forEach(s => {
+    const file = `${TS_DIR}/${String(s.station_id).replace(/-/g, "_")}.csv`;
+    Papa.parse(file, {
+      download: true, header: true, dynamicTyping: true, skipEmptyLines: true,
+      complete: (res) => {
+        if (res.data && res.data.length) {
+          const cols = Object.keys(res.data[0]).filter(k => k && k !== "time");
+          for (const c of cols) {
+            const hasFinite = res.data.some(r => Number.isFinite(+r[c]));
+            if (hasFinite) activeSensors++;
+          }
+        }
+        if (--pending === 0) {
+          document.getElementById("statActiveSensors").textContent = activeSensors;
+        }
+      },
+      error: () => { if (--pending === 0) {
+        document.getElementById("statActiveSensors").textContent = activeSensors;
+      } },
+    });
+  });
+}
+
+function loadOverlayData() {
+  // daily SM — derived on-the-fly from each station's timeseries. We always
+  // average `soil_moisture_10cm` (per user spec). 47 small CSV fetches in
+  // parallel is fast enough; no precomputed wide-format file needed.
+  const parseTS = (s) => new Promise(resolve => {
+    const file = `${TS_DIR}/${s.station_id.replace(/-/g, "_")}.csv`;
+    Papa.parse(file, {
+      download: true, header: true, skipEmptyLines: true,
+      dynamicTyping: (h) => h !== "time",
+      complete: (res) => resolve({ s, rows: res.data }),
+      error:    ()    => resolve({ s, rows: [] }),  // missing file → no dot color
+    });
+  });
+
+  Promise.all(stations.map(parseTS)).then(results => {
+    // byDate[date][station_id] = mean of soil_moisture_10cm for that day
+    const byDate = {};
+    results.forEach(({ s, rows }) => {
+      const sums = {};
+      rows.forEach(r => {
+        if (!r.time) return;
+        const v = +r.soil_moisture_10cm;
+        if (!Number.isFinite(v)) return;
+        const d = String(r.time).slice(0, 10);
+        const acc = sums[d] || (sums[d] = { sum: 0, n: 0 });
+        acc.sum += v; acc.n += 1;
+      });
+      Object.entries(sums).forEach(([d, { sum, n }]) => {
+        (byDate[d] || (byDate[d] = {}))[s.station_id] = sum / n;
+      });
+    });
+    const dates = Object.keys(byDate).sort();
+    dailySM = { dates, byDate };
+    // initialize the date picker to the most recent in-situ date
+    const di = document.getElementById("overlayDate");
+    if (!di.value && dates.length) {
+      di.value = dates[dates.length - 1];
+    }
+    applyOverlay();
+  });
+
+  // UAV catalog
+  Papa.parse("data/uav/catalog.csv", {
+    download: true, header: true, dynamicTyping: true, skipEmptyLines: true,
+    complete: (res) => {
+      uavCatalog = res.data.filter(r => r.date && r.file).map(r => ({ ...r, date: String(r.date) }));
+      console.log(`[uav] catalog loaded: ${uavCatalog.length} entries`);
+      // If timeseries loaded first, the chart was built with a too-narrow
+      // x-range; rebuild so its xRangeInit can include catalogued flight
+      // dates and the scene strip's UAV dots aren't clipped.
+      if (currentTS && currentTS.length) renderChart();
+      applyOverlay();
+      // One-time month-jump: land on the most recent UAV flight month so
+      // the user opens the UAVs tab to a useful view. Subsequent product
+      // switches preserve whatever month the user navigated to.
+      initUavCalendarMonth();
+      // Re-apply the active payload so its UI cards (PolRA selector,
+      // calendar dots) reflect the just-loaded catalog.
+      setUavPayload(uavPayload);
+    },
+    error: (err) => console.warn("UAV catalog not found (optional)", err),
+  });
+
+  // Satellite catalog (MODIS / SMAP / NISAR — produced by nc_to_overlay.py data/satellites/)
+  Papa.parse("data/satellites/catalog.csv", {
+    download: true, header: true, dynamicTyping: true, skipEmptyLines: true,
+    complete: (res) => {
+      satCatalog = res.data.filter(r => r.date && r.file).map(r => ({
+        ...r, date: String(r.date), source: String(r.source || "").toLowerCase()
+      }));
+      // log a quick by-source summary so we can verify in the console
+      const counts = {};
+      satCatalog.forEach(r => { const k = `${r.source}:${r.product}`; counts[k] = (counts[k]||0)+1; });
+      console.log(`[sat] catalog loaded: ${satCatalog.length} entries`, counts);
+      // (We deliberately do NOT disable options that have no data — the
+      // info bar already shows "no scenes catalogued" when the user picks one.)
+      if (currentTS && currentTS.length) renderChart();
+      applyOverlay();
+    },
+    error: (err) => console.warn("Satellite catalog not found yet (run download_modis.py + nc_to_overlay.py)"),
+  });
+
+  // Basemap catalog (LULC, soil properties, ...)
+  fetch("data/basemaps/catalog.json")
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(j => {
+      basemapCatalog = j.basemaps || [];
+      console.log(`[basemap] catalog loaded: ${basemapCatalog.length} entries`);
+      const sel = document.getElementById("basemapSelect");
+      basemapCatalog.forEach(b => {
+        const opt = document.createElement("option");
+        opt.value = b.id; opt.textContent = b.label;
+        sel.appendChild(opt);
+      });
+      // default-select LULC if available, otherwise the first basemap
+      const def = basemapCatalog.find(b => b.id.startsWith("lulc")) || basemapCatalog[0];
+      if (def) {
+        sel.value = def.id;
+        applyBasemap();
+      }
+    })
+    .catch(err => console.warn("Basemap catalog not found (optional):", err));
+}
+
+function addStationMarker(s) {
+  const icon = L.divIcon({
+    className: "",
+    html: `<div class="station-dot" data-id="${s.station_id}"></div>`,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  });
+  const m = L.marker([s.lat, s.lon], { icon, title: s.station_id }).addTo(map);
+  m.on("click", () => selectStation(s));
+  m.bindTooltip(s.station_id, { direction: "top", offset: [0, -8] });
+  stationMarkers[s.station_id] = m;
+}
+
+// =============================================================
+// On click: load timeseries CSV for that station, render panel
+// =============================================================
+function selectStation(s) {
+  currentStation = s;
+
+  // marker visual state
+  document.querySelectorAll(".station-dot.selected").forEach(el => el.classList.remove("selected"));
+  const dot = document.querySelector(`.station-dot[data-id="${s.station_id}"]`);
+  if (dot) dot.classList.add("selected");
+
+  // header + info
+  document.getElementById("stationLabel").textContent = `Station ID (${s.station_id})`;
+  document.getElementById("stationInfo").innerHTML = `
+    <b>${s.station_id}</b><br>
+    Lat / Lon: ${(+s.lat).toFixed(5)}, ${(+s.lon).toFixed(5)}<br>
+    Elevation: ${s.elevation_m} m<br>
+    Land cover: ${s.land_cover}<br>
+    Sensor: ${s.sensor_model}<br>
+    Depths: ${s.depths_cm} cm
+  `;
+  document.getElementById("stationNotes").innerHTML = `
+    Installed: ${s.install_date}<br>
+    ${s.notes || "-"}
+  `;
+
+  // photos
+  const grid = document.getElementById("photoGrid");
+  // Installation photos. Each station can have up to three variants on
+  // disk (some sites are forest, so they also have a tree photo):
+  //   {sid}_SM_10cm.png  — 10 cm sensor close-up
+  //   {sid}_SM_20cm.png  — 20 cm sensor close-up
+  //   {sid}_Tree.png     — surrounding canopy / tree (forest sites)
+  // station_id uses dashes (HP_1-2) but filenames use underscores (HP_1_2),
+  // so we normalize before lookup. Each tile self-hides if missing.
+  grid.innerHTML = "";
+  const sidU = s.station_id.replace(/-/g, "_");
+  const tiles = [
+    { caption: "10 cm sensor", file: `${PHOTO_DIR}/installation/${sidU}_SM_10cm.png` },
+    { caption: "20 cm sensor", file: `${PHOTO_DIR}/installation/${sidU}_SM_20cm.png` },
+    { caption: "Tree / canopy", file: `${PHOTO_DIR}/installation/${sidU}_Tree.png` },
+  ];
+
+  tiles.forEach(({ caption, file }) => {
+    const fig = document.createElement("figure");
+    fig.style.display = "none";                  // shown only if the image loads
+    fig.innerHTML = `<span>${caption}</span>`;
+    grid.appendChild(fig);
+    const img = new Image();
+    img.onload = () => {
+      fig.style.display = "";
+      fig.innerHTML = "";
+      fig.appendChild(img);
+      const cap = document.createElement("figcaption");
+      cap.textContent = caption;
+      fig.appendChild(cap);
+    };
+    img.onerror = () => { /* leave hidden */ };
+    img.src = file;
+  });
+
+  // load timeseries — file uses underscores (HP_10_1.csv) while station_id uses
+  // dashes (HP_10-1), so normalize before lookup.
+  const tsFile = `${s.station_id.replace(/-/g, "_")}.csv`;
+  setChartMessage("Loading timeseries…");
+  Papa.parse(`${TS_DIR}/${tsFile}`, {
+    download: true,
+    header: true,
+    dynamicTyping: (h) => h !== "time",   // keep time as string (UTC)
+    skipEmptyLines: true,
+    complete: (res) => {
+      console.log(`[ts] ${s.station_id}: ${res.data.length} rows`, res.errors);
+      currentTS = res.data.filter(r => r.time);
+      if (!currentTS.length) { setChartMessage("Timeseries file is empty."); return; }
+      // always reset the date range to this station's data extents — otherwise
+      // a previously-selected station's narrower range silently hides data.
+      const first = String(currentTS[0].time).slice(0,10);
+      const last  = String(currentTS[currentTS.length-1].time).slice(0,10);
+      document.getElementById("dateStart").value = first;
+      document.getElementById("dateEnd").value   = last;
+      // auto-detect variables from CSV header — rebuild only if schema changed
+      const vars = Object.keys(currentTS[0]).filter(k => k !== "time");
+      ensureVarState(vars);
+      renderChart();
+    },
+    error: (err) => {
+      console.error(`[ts] failed to load ${tsFile}`, err);
+      currentTS = null;
+      setChartMessage(`No timeseries file for ${s.station_id}`);
+    },
+  });
+}
+
+function setChartMessage(msg) {
+  Plotly.purge("chart");
+  document.getElementById("chart").innerHTML = `<div class="chart-msg">${msg}</div>`;
+}
+
+// =============================================================
+// Overlay: applies the date + layer toggles to the map and chart
+// Called whenever the date picker or a layer checkbox changes.
+// =============================================================
+function applyOverlay() {
+  const dateStr = document.getElementById("overlayDate").value;
+  const showDots = document.getElementById("layerStations").checked;
+  const showUAV  = document.getElementById("layerUAV").checked;
+
+  // ---- station dot coloring -----------------------------------------
+  const info = [];
+  if (showDots && dailySM && dateStr) {
+    // exact day if available, otherwise the closest day in the table
+    let row = dailySM.byDate[dateStr];
+    let usedDate = dateStr;
+    if (!row) {
+      const closest = nearestDateRow(
+        dailySM.dates.map(d => ({ date: d })), dateStr
+      );
+      if (closest) { usedDate = closest.date; row = dailySM.byDate[usedDate]; }
+    }
+    if (row) {
+      colorStationDots(row);
+      const vals = Object.values(row).filter(v => typeof v === "number" && !isNaN(v));
+      const mean = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : NaN;
+      info.push(`SM mean ${mean.toFixed(3)} m³/m³ (${usedDate}${usedDate !== dateStr ? ", nearest" : ""})`);
+    }
+  } else {
+    resetStationDots();
+  }
+
+  // ---- UAV overlay --------------------------------------------------
+  if (uavLayer) { map.removeLayer(uavLayer); uavLayer = null; }
+  if (showUAV && uavCatalog.length && dateStr) {
+    const product = document.getElementById("uavProduct").value;
+    const candidates = uavCatalog.filter(r => r.product === product);
+    if (candidates.length) {
+      const m = nearestDateRow(candidates, dateStr);
+      if (m) {
+        const bounds = [[+m.s, +m.w], [+m.n, +m.e]];
+        const op = +document.getElementById("uavOpacity").value / 100;
+        uavLayer = L.imageOverlay(`data/uav/${m.file}`, bounds, {
+          opacity: op, interactive: false, pane: "uavPane",
+        }).addTo(map);
+        const time = m.time ? String(m.time).slice(0, 5) : "";
+        const desc = m.description || product.toUpperCase();
+        const tag  = (m.date !== dateStr) ? ", nearest" : "";
+        info.push(`UAV ${desc}: ${m.date} ${time}${tag}  (${m.resolution_m} m)`);
+      }
+    } else {
+      info.push(`UAV ${product.toUpperCase()}: no flights catalogued`);
+    }
+  }
+
+  // ---- Satellite overlay (HLS / Landsat / MODIS, NDVI or LST) ----
+  if (satLayer) { map.removeLayer(satLayer); satLayer = null; }
+  const showSat = document.getElementById("layerSat").checked;
+  if (showSat && satCatalog.length && dateStr) {
+    // dropdown value is "source:product" — split to filter
+    const sel = document.getElementById("satProduct").value;
+    const [src, prod] = sel.split(":");
+    const candidates = satCatalog.filter(
+      r => (r.product === prod) && (String(r.source || "") === src)
+    );
+    if (candidates.length) {
+      const m = nearestDateRow(candidates, dateStr);
+      if (m) {
+        const bounds = [[+m.s, +m.w], [+m.n, +m.e]];
+        const op = +document.getElementById("satOpacity").value / 100;
+        satLayer = L.imageOverlay(`data/satellites/${m.file}`, bounds, {
+          opacity: op, interactive: false, pane: "satellitePane",
+        }).addTo(map);
+        const time = m.time ? String(m.time).slice(0,5) : "";
+        const tag  = (m.date !== dateStr) ? ", nearest" : "";
+        info.push(`${src.toUpperCase()} ${prod.toUpperCase()}: ${m.date} ${time}${tag}  (${m.resolution_m} m)`);
+      }
+    } else {
+      info.push(`${src.toUpperCase()} ${prod.toUpperCase()}: no scenes catalogued`);
+    }
+  }
+
+  // ---- NISAR overlay (independent toggle, variable selectable) -------
+  if (nisarLayer) { map.removeLayer(nisarLayer); nisarLayer = null; }
+  const showNisar = document.getElementById("layerNisar").checked;
+  if (showNisar && satCatalog.length && dateStr) {
+    const nProd = document.getElementById("nisarProduct").value;
+    const candidates = satCatalog.filter(
+      r => r.source === "nisar" && r.product === nProd
+    );
+    if (candidates.length) {
+      const m = nearestDateRow(candidates, dateStr);
+      if (m) {
+        const bounds = [[+m.s, +m.w], [+m.n, +m.e]];
+        const op = +document.getElementById("nisarOpacity").value / 100;
+        nisarLayer = L.imageOverlay(`data/satellites/${m.file}`, bounds, {
+          opacity: op, interactive: false, pane: "satellitePane",
+        }).addTo(map);
+        nisarLayer.bringToFront();
+        const time = m.time ? String(m.time).slice(0,5) : "";
+        const tag  = (m.date !== dateStr) ? ", nearest" : "";
+        info.push(`NISAR ${nProd.toUpperCase()}: ${m.date} ${time}${tag}  (${m.resolution_m} m)`);
+      }
+    } else {
+      info.push(`NISAR ${nProd.toUpperCase()}: no scenes catalogued`);
+    }
+  }
+
+  document.getElementById("overlayInfo").textContent = info.length ? info.join("  •  ") : "—";
+
+  // ---- legends/colorbars for everything currently visible -----------
+  renderColorbars({
+    showDots,
+    showUAV, product: document.getElementById("uavProduct").value,
+    showSat: document.getElementById("layerSat").checked,
+    satProduct: document.getElementById("satProduct").value,
+    showNisar: document.getElementById("layerNisar").checked,
+    nisarProduct: document.getElementById("nisarProduct").value,
+  });
+
+  // ---- vertical date marker on the timeseries chart -----------------
+  drawDateMarker(dateStr);
+
+  // ---- scene-availability strip (red dots under the chart) ----------
+  renderSceneStrip();
+}
+
+function renderColorbars({ showDots, showUAV, product, showSat, satProduct, showNisar, nisarProduct }) {
+  const container = document.getElementById("colorbars");
+  container.innerHTML = "";
+  const make = (cb, prefix) => {
+    const div = document.createElement("div");
+    div.className = "colorbar";
+    div.innerHTML = `
+      <span class="cb-prefix">${prefix}</span>
+      <span class="cb-min">${cb.min}</span>
+      <div class="cb-gradient" style="background:${cb.gradient}"></div>
+      <span class="cb-max">${cb.max}${cb.unit ? " " + cb.unit : ""}</span>`;
+    return div;
+  };
+  // 1) Station dots (always SM colormap)
+  if (showDots) container.appendChild(make(COLORBARS.sm, "Stations (SM)"));
+
+  // 2) UAV product
+  if (showUAV) {
+    if (product === "rgb") {
+      const div = document.createElement("div");
+      div.className = "colorbar";
+      div.innerHTML = `<span class="cb-prefix">UAV RGB</span><span class="cb-rgb-note">true-color composite (no scalar legend)</span>`;
+      container.appendChild(div);
+    } else if (COLORBARS[product]) {
+      container.appendChild(make(COLORBARS[product], `UAV ${COLORBARS[product].label}`));
+    }
+  }
+
+  // 2b) Satellite product (satProduct is now "source:product")
+  if (showSat && satProduct) {
+    const [src, prod] = satProduct.split(":");
+    if (COLORBARS[prod]) {
+      container.appendChild(make(COLORBARS[prod],
+        `${src.toUpperCase()} ${COLORBARS[prod].label}`));
+    }
+  }
+
+  // 2c) NISAR (own toggle, variable selectable)
+  if (showNisar && nisarProduct && COLORBARS[nisarProduct]) {
+    container.appendChild(make(COLORBARS[nisarProduct],
+      `NISAR ${COLORBARS[nisarProduct].label}`));
+  }
+
+  // 3) Basemap (LULC / soil properties)
+  if (currentBasemap) {
+    if (currentBasemap.type === "categorical") {
+      const div = document.createElement("div");
+      div.className = "colorbar";
+      div.style.alignItems = "flex-start";
+      const swatches = (currentBasemap.classes || []).map(c =>
+        `<span style="display:inline-flex;align-items:center;gap:4px;">
+           <span style="display:inline-block;width:11px;height:11px;background:${c.color};border:1px solid #222;flex-shrink:0;"></span>
+           <span>${c.label}</span>
+         </span>`).join("");
+      div.innerHTML = `
+        <span class="cb-prefix" style="padding-top:2px;">${currentBasemap.label}</span>
+        <span style="font-size:10px;display:flex;flex-wrap:wrap;gap:4px 10px;max-height:84px;overflow-y:auto;flex:1;line-height:1.4;">
+          ${swatches}
+        </span>`;
+      container.appendChild(div);
+    } else if (currentBasemap.type === "continuous") {
+      // build a CSS gradient that exactly mirrors the source colormap.
+      // Priority: explicit stops from QML > known named colormap > grayscale.
+      let grad;
+      if (Array.isArray(currentBasemap.stops) && currentBasemap.stops.length) {
+        const stops = currentBasemap.stops;
+        const vmin = currentBasemap.vmin, vmax = currentBasemap.vmax;
+        const span = vmax - vmin || 1;
+        // sample stops down to ≤ 32 to keep the gradient string short
+        const N = Math.min(32, stops.length);
+        const idx = Array.from({length: N}, (_, i) => Math.floor(i * (stops.length - 1) / (N - 1)));
+        const parts = idx.map(i => {
+          const [v, c] = stops[i];
+          const pct = ((v - vmin) / span * 100).toFixed(1);
+          return `${c} ${pct}%`;
+        });
+        grad = `linear-gradient(to right, ${parts.join(", ")})`;
+      } else if (currentBasemap.colormap === "viridis") {
+        grad = "linear-gradient(to right, rgb(68,1,84), rgb(59,82,139), rgb(33,145,140), rgb(94,201,98), rgb(253,231,37))";
+      } else {
+        grad = "linear-gradient(to right, #444, #ddd)";
+      }
+      container.appendChild(make({
+        min: Math.round(currentBasemap.vmin * 100) / 100,
+        max: Math.round(currentBasemap.vmax * 100) / 100,
+        unit: currentBasemap.unit || "", gradient: grad,
+      }, currentBasemap.label));
+    }
+  }
+}
+
+// =============================================================
+// Basemap (LULC, soil properties, ...) layer management
+// =============================================================
+function applyBasemap() {
+  if (basemapLayer) { map.removeLayer(basemapLayer); basemapLayer = null; }
+  const sel = document.getElementById("basemapSelect").value;
+  currentBasemap = basemapCatalog.find(b => b.id === sel) || null;
+  if (currentBasemap) {
+    const op = +document.getElementById("basemapOpacity").value / 100;
+    const bounds = [[currentBasemap.s, currentBasemap.w], [currentBasemap.n, currentBasemap.e]];
+    basemapLayer = L.imageOverlay(`data/basemaps/${currentBasemap.file}`, bounds, {
+      opacity: op, interactive: false, pane: "basemapPane",
+    }).addTo(map);
+  }
+  // refresh legends so new basemap entry shows up / disappears
+  applyOverlay();
+}
+
+function setBasemapOpacity(pct) {
+  document.getElementById("basemapOpacityVal").textContent = `${pct}%`;
+  if (basemapLayer) basemapLayer.setOpacity(pct / 100);
+}
+
+function colorStationDots(row) {
+  Object.entries(stationMarkers).forEach(([sid, m]) => {
+    const el = m.getElement();
+    if (!el) return;
+    const dot = el.querySelector(".station-dot");
+    if (!dot) return;
+    const v = row[sid];
+    dot.style.background = smToColor(v);
+    dot.title = (typeof v === "number") ? `${sid}: ${v.toFixed(3)} m³/m³` : `${sid}: no data`;
+  });
+}
+
+function resetStationDots() {
+  Object.values(stationMarkers).forEach(m => {
+    const el = m.getElement();
+    if (!el) return;
+    const dot = el.querySelector(".station-dot");
+    if (dot) { dot.style.background = ""; dot.title = ""; }
+  });
+}
+
+// Build the date-marker shape + annotation for a given date.
+// Used by renderChart() to bake them into the initial layout, AND by
+// drawDateMarker() below to update them in place after the chart exists.
+function dateMarkerShape(dateStr) {
+  return {
+    type: "line", xref: "x", yref: "paper",
+    x0: dateStr, x1: dateStr, y0: 0, y1: 1,
+    line: { color: "#dc2626", width: 2, dash: "dot" },
+    editable: true,                                 // draggable
+  };
+}
+function dateMarkerAnnotation(dateStr) {
+  return {
+    xref: "x", yref: "paper",
+    x: dateStr, y: 1.02,
+    text: dateStr, showarrow: false,
+    bgcolor: "#dc2626", bordercolor: "#dc2626",
+    font: { color: "#fff", size: 11 },
+    xanchor: "left", yanchor: "bottom",
+  };
+}
+
+function drawDateMarker(dateStr) {
+  const el = document.getElementById("chart");
+  if (!el || !el.data || !dateStr) return;        // no chart yet → skip
+  const layout = el.layout || {};
+  if (layout.shapes && layout.shapes.length && layout.annotations && layout.annotations.length) {
+    // Update in place — indexed relayout is more reliable than replacing
+    // the whole shapes/annotations arrays, especially for editable shapes
+    // that Plotly tracks internally.
+    Plotly.relayout(el, {
+      "shapes[0].x0":      dateStr,
+      "shapes[0].x1":      dateStr,
+      "annotations[0].x":  dateStr,
+      "annotations[0].text": dateStr,
+    });
+  } else {
+    Plotly.relayout(el, {
+      shapes:      [dateMarkerShape(dateStr)],
+      annotations: [dateMarkerAnnotation(dateStr)],
+    });
+  }
+}
+
+// Single relayout handler for the chart — handles BOTH:
+//   (a) draggable date marker → push new date to the overlay input
+//   (b) chart pan/zoom        → mirror x-axis DOMAIN to the scene strip
+// We rebuild the chart on every station switch via Plotly.react, and
+// Plotly's internal event emitter sometimes drops listeners across that
+// rebuild. So we re-attach on every renderChart() (see wireChartRelayout).
+function chartRelayoutHandler(ev) {
+  // (a) shape drag — coord keys arrive as "shapes[0].x0" / "shapes[0].x1"
+  const raw = ev["shapes[0].x0"] ?? ev["shapes[0].x1"];
+  if (raw != null) {
+    const d = new Date(raw);
+    if (!isNaN(d.getTime())) {
+      const yyyy = d.getUTCFullYear();
+      const mm   = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const dd   = String(d.getUTCDate()).padStart(2, "0");
+      const newDate = `${yyyy}-${mm}-${dd}`;
+      const di = document.getElementById("overlayDate");
+      if (di.value !== newDate) {
+        di.value = newDate;
+        applyOverlay();                              // dots + layers + redraws marker
+      }
+    }
+    return;                                          // skip strip-domain mirror on drag
+  }
+  // (b) pan/zoom — mirror the chart's plot-area domain to the strip
+  const main = document.getElementById("chart");
+  const strip = document.getElementById("sceneStrip");
+  const xa = main && main._fullLayout && main._fullLayout.xaxis;
+  if (xa && strip && strip.layout) {
+    Plotly.relayout(strip, { "xaxis.domain": xa.domain });
+  }
+}
+
+function wireChartRelayout() {
+  const el = document.getElementById("chart");
+  if (!el || !el.on) return;
+  // Re-attach cleanly: removeAllListeners is provided by Plotly's emitter
+  // on the chart div. Without this, repeated renderChart() calls would
+  // either stack duplicate listeners or — worse — silently drop them
+  // after Plotly.react rebuilds the chart for a new station.
+  if (el.removeAllListeners) el.removeAllListeners("plotly_relayout");
+  el.on("plotly_relayout", chartRelayoutHandler);
+}
+
+// =============================================================
+// Build variable checkboxes from the CSV header.
+// Preserve user selections across station switches by keying on the variable
+// list — only rebuild when the schema actually changes.
+// =============================================================
+function ensureVarState(vars) {
+  const newKey = vars.join("|");
+  const oldKey = varState.map(v => v.name).join("|");
+  if (newKey === oldKey && varState.length) return;
+
+  // bucket vars by category and assign palette colors per slot
+  const buckets = { sm: [], temp: [], precip: [], other: [] };
+  vars.forEach(v => buckets[categorize(v)].push(v));
+
+  // default-checked variables: prefer 10 cm soil + precipitation. Fall back to
+  // the first variable in each category if those names aren't present (older
+  // / forest-only schemas).
+  const DEFAULT_ON = new Set(["soil_moisture_10cm", "soil_temperature_10cm", "precipitation"]);
+
+  varState = [];
+  ["sm", "temp", "precip", "other"].forEach(cat => {
+    const anyDefault = buckets[cat].some(v => DEFAULT_ON.has(v));
+    buckets[cat].forEach((v, i) => {
+      varState.push({
+        name: v,
+        cat,
+        color: PALETTE[cat][i % PALETTE[cat].length],
+        // if any preferred default exists in this category, only it is checked;
+        // otherwise check the first var so the chart isn't empty.
+        checked: anyDefault ? DEFAULT_ON.has(v) : (i === 0),
+        opacity: 1.0,           // per-variable trace opacity (0–1)
+      });
+    });
+  });
+  renderVarUI();
+}
+
+function renderVarUI() {
+  const container = document.getElementById("varList");
+  container.innerHTML = "";
+  varState.forEach((v, idx) => {
+    const lbl = document.createElement("label");
+    lbl.style.borderLeftColor = v.color;
+    lbl.style.color = v.color;
+    lbl.innerHTML = `
+      <input type="checkbox" ${v.checked ? "checked" : ""} />
+      <span style="color:#1a1a1a;">${v.name}</span>
+      <input type="range" min="0" max="100" value="${Math.round(v.opacity * 100)}"
+             title="opacity"
+             style="width:50px;height:12px;margin-left:4px;accent-color:currentColor;vertical-align:middle;">
+      <span class="opacity-pct" style="color:#888;font-size:10px;width:24px;text-align:right;">${Math.round(v.opacity * 100)}%</span>
+    `;
+    const cb = lbl.querySelector('input[type="checkbox"]');
+    const sl = lbl.querySelector('input[type="range"]');
+    const pct = lbl.querySelector('.opacity-pct');
+    cb.addEventListener("change", e => {
+      varState[idx].checked = e.target.checked;
+      renderChart();
+    });
+    sl.addEventListener("input", e => {
+      const v01 = +e.target.value / 100;
+      varState[idx].opacity = v01;
+      pct.textContent = `${e.target.value}%`;
+      // only re-render if this variable is currently shown
+      if (varState[idx].checked) renderChart();
+    });
+    // stop slider clicks from toggling the checkbox (label-bubbling)
+    sl.addEventListener("click", e => e.preventDefault());
+    container.appendChild(lbl);
+  });
+}
+
+// =============================================================
+// Chart
+// =============================================================
+function renderChart() {
+  if (!currentTS || !currentTS.length) { setChartMessage("No data loaded."); return; }
+  const selected = varState.filter(v => v.checked);
+  if (!selected.length) { setChartMessage("Select at least one variable."); return; }
+
+  // date filter
+  const ds = document.getElementById("dateStart").value;
+  const de = document.getElementById("dateEnd").value;
+  const filtered = currentTS.filter(r => {
+    const d = String(r.time).slice(0, 10);
+    return (!ds || d >= ds) && (!de || d <= de);
+  });
+  if (!filtered.length) { setChartMessage("No data in selected date range."); return; }
+  // append "Z" so Plotly treats the strings as UTC instead of browser-local
+  const x = filtered.map(r => String(r.time).replace(" ", "T") + "Z");
+
+  // category order: SM stays on the left when present; the rest go to the right
+  const order = ["sm", "temp", "precip", "other"];
+  const catsPresent = order.filter(c => selected.some(s => s.cat === c));
+  const catToAxisIdx = {};
+  catsPresent.forEach((c, i) => { catToAxisIdx[c] = i + 1; });
+
+  // build traces
+  const traces = selected.map(v => {
+    const idx = catToAxisIdx[v.cat];
+    const op = (v.opacity != null) ? v.opacity : 1.0;
+    const t = {
+      x,
+      y: filtered.map(r => +r[v.name]),
+      name: v.name,
+      yaxis: idx === 1 ? "y" : `y${idx}`,
+      opacity: op,
+    };
+    if (CAT_INFO[v.cat].kind === "bar") {
+      t.type = "bar";
+      t.marker = { color: v.color };
+    } else {
+      t.type = "scatter";
+      t.mode = "lines";
+      t.line = { color: v.color, width: 1.5 };
+    }
+    return t;
+  });
+
+  // ----- axis layout ----------------------------------------------------
+  // 1st axis (yaxis) lives on the LEFT.
+  // Every additional category gets its own RIGHT axis, stepped inward so
+  // multiple right axes don't sit on top of each other.
+  const numRight = catsPresent.length - 1;
+  const step = 0.10;                                   // gap between right axes
+  // shrink xaxis only when there are 2+ right axes; one right axis can sit
+  // at the plot edge with its title in the right margin.
+  const xMax = numRight <= 1 ? 1 : 1 - (numRight - 1) * step;
+
+  // bake the date marker into the initial layout so Plotly.react manages
+  // it as a first-class layout element. After station switches the marker
+  // stays draggable and indexed relayout updates work reliably.
+  const overlayDateInit = document.getElementById("overlayDate")?.value;
+
+  // x-range: the data extent, expanded to always include the overlay date.
+  // Without this, switching to a station whose data begins later than the
+  // overlay date would auto-fit the axis past the marker — hiding the
+  // chart's vertical line AND the strip's highlighted dot.
+  const xs = filtered.map(r => String(r.time));
+  let xRangeInit;
+  if (xs.length) {
+    // Trim leading/trailing rows whose selected variables are all NaN —
+    // otherwise an empty header from the timeseries CSV pushes the chart
+    // x-range out to e.g. Jan 2025 even when real data only starts months
+    // later. Tightening to the first/last valid row mimics Plotly's autoscale.
+    const isValid = r => selected.some(v => Number.isFinite(+r[v.name]));
+    let firstValid = -1, lastValid = -1;
+    for (let i = 0; i < filtered.length; i++) { if (isValid(filtered[i])) { firstValid = i; break; } }
+    for (let i = filtered.length - 1; i >= 0; i--) { if (isValid(filtered[i])) { lastValid = i; break; } }
+    let lo = (firstValid >= 0) ? String(filtered[firstValid].time) : xs[0];
+    let hi = (lastValid  >= 0) ? String(filtered[lastValid].time)  : xs[xs.length - 1];
+    if (overlayDateInit) {
+      if (overlayDateInit < lo.slice(0, 10)) lo = overlayDateInit;
+      if (overlayDateInit > hi.slice(0, 10)) hi = overlayDateInit;
+    }
+    // Extend the upper bound only so the scene-strip's UAV/sat dots that
+    // sit AFTER the timeseries (e.g. UAV flights past the last in-situ
+    // sample) stay visible. Don't pull lo earlier — the user wants the
+    // chart to start at the actual data, not at unrelated early flights.
+    const catRows = uavCatalog.concat(satCatalog);
+    for (const r of catRows) {
+      const d = String(r.date || "").slice(0, 10);
+      if (!d) continue;
+      if (d > hi.slice(0, 10)) hi = d;
+    }
+    xRangeInit = [lo, hi];
+  }
+
+  const layout = {
+    margin: { l: 65, r: 70, t: 30, b: 40 },
+    legend: { orientation: "h", x: 0, y: 1.18 },
+    xaxis: {
+      type: "date", domain: [0, xMax],
+      range: xRangeInit,
+      title: { text: "Time (UTC)", font: { size: 11 } },
+    },
+    plot_bgcolor: "#fff",
+    paper_bgcolor: "#fff",
+    barmode: "overlay",
+    bargap: 0,
+    shapes:      overlayDateInit ? [dateMarkerShape(overlayDateInit)]      : [],
+    annotations: overlayDateInit ? [dateMarkerAnnotation(overlayDateInit)] : [],
+  };
+
+  catsPresent.forEach((cat, i) => {
+    const idx = i + 1;
+    const info = CAT_INFO[cat];
+    // axis color = first selected trace in this category (matches its line/bar)
+    const axisColor = selected.find(s => s.cat === cat).color;
+    // short axis title (just the unit) — variable name is already in legend
+    const titleText = info.unit ? `(${info.unit})` : info.label;
+
+    const cfg = {
+      title: { text: titleText, font: { color: axisColor, size: 12 } },
+      tickfont: { color: axisColor, size: 11 },
+      linecolor: axisColor,
+      gridcolor: "#eee",
+      zerolinecolor: "#ddd",
+      automargin: true,                                // let Plotly fit labels
+    };
+
+    // hyetograph: give precip 3x headroom so bars only occupy the upper portion
+    if (info.reversed) {
+      const allP = selected
+        .filter(s => s.cat === cat)
+        .flatMap(s => filtered.map(r => +r[s.name] || 0));
+      const maxP = Math.max(0.5, ...allP);
+      cfg.range = [maxP * 3, 0];   // reversed → 0 at top, bars hang down
+    }
+
+    if (idx === 1) {
+      cfg.side = "left";
+      layout.yaxis = cfg;
+    } else {
+      cfg.side = "right";
+      cfg.overlaying = "y";
+      if (numRight === 1) {
+        // single right axis: default placement at plot edge, title goes
+        // into the right margin — no anchor:free needed.
+      } else {
+        cfg.anchor = "free";
+        // first right axis (idx=2) sits at the plot's right edge,
+        // each subsequent one steps further right toward 1.0
+        cfg.position = Math.min(1, xMax + (idx - 2) * step);
+      }
+      layout[`yaxis${idx}`] = cfg;
+    }
+  });
+
+  // purge any "message" placeholder before drawing
+  const el = document.getElementById("chart");
+  if (el.querySelector(".chart-msg")) el.innerHTML = "";
+
+  Plotly.react("chart", traces, layout, {
+    responsive: true,
+    displaylogo: false,
+    edits: { shapePosition: true },                  // marker is draggable
+  });
+
+  // re-apply the overlay date marker (Plotly.react replaces shapes)
+  const overlayDate = document.getElementById("overlayDate")?.value;
+  if (overlayDate) drawDateMarker(overlayDate);
+  wireChartRelayout();                               // re-attach drag/zoom listener
+  renderSceneStrip();                                // scene-availability strip
+}
+
+// =============================================================
+// Scene-availability strip — red dots below the chart at every date when
+// each Satellite / UAV / NISAR scene exists for the currently-selected
+// product (regardless of whether the layer toggle is on).
+// Clicking a dot snaps the Overlay date to that scene.
+// =============================================================
+let stripClickWired = false;        // strip click → overlay date
+let stripZoomWired  = false;        // main chart zoom/pan → strip x-range
+function renderSceneStrip() {
+  const stripEl = document.getElementById("sceneStrip");
+  if (!stripEl) return;
+
+  // always show all lanes — selection follows only the product dropdowns
+  const satSel  = document.getElementById("satProduct").value;   // "src:prod"
+  const uavProd = document.getElementById("uavProduct").value;
+  const nProd   = document.getElementById("nisarProduct").value;
+  const [satSrc, satProdKey] = satSel.split(":");
+
+  const satRows   = satCatalog.filter(r => r.source === satSrc && r.product === satProdKey);
+  const uavRows   = uavCatalog.filter(r => r.product === uavProd);
+  const nisarRows = satCatalog.filter(r => r.source === "nisar" && r.product === nProd);
+
+  // index of the nearest scene to the current overlay date, per lane —
+  // that dot gets a brighter / larger style so the user sees which scene
+  // is currently rendered on the map.
+  const overlayDate = document.getElementById("overlayDate").value;
+  const nearestIdx = (rows) => {
+    if (!rows.length || !overlayDate) return -1;
+    const target = new Date(overlayDate).getTime();
+    let bi = 0, bd = Math.abs(new Date(rows[0].date).getTime() - target);
+    for (let i = 1; i < rows.length; i++) {
+      const d = Math.abs(new Date(rows[i].date).getTime() - target);
+      if (d < bd) { bi = i; bd = d; }
+    }
+    return bi;
+  };
+
+  // Two traces per lane: (1) all dots small/pale, (2) the nearest dot drawn
+  // on top, big and bright. Splitting into two traces avoids a Plotly.react
+  // diff issue where per-point marker arrays sometimes weren't re-applied
+  // when only the "selected index" changed across re-renders.
+  const baseLane = (rows, label, hoverPrefix) => ({
+    x: rows.map(r => `${r.date}T${r.time || "00:00:00"}Z`),
+    y: rows.map(_ => label),
+    customdata: rows.map(r => r.date),
+    text: rows.map(r => `${hoverPrefix} ${r.date} ${(r.time||"").slice(0,5)}`),
+    hovertemplate: "%{text}<extra></extra>",
+    mode: "markers", type: "scatter",
+    marker: { size: 8, color: "#fca5a5", line: { color: "#dc2626", width: 1 } },
+    name: label, showlegend: false,
+  });
+  // hiLane ALWAYS returns a trace — empty arrays when there's nothing to
+  // highlight — so the trace count is constant (6). Plotly.react diffs
+  // traces by index, so a varying trace count between calls causes the
+  // "selected" styling to land on the wrong trace and the highlight stops
+  // updating after the first render.
+  const hiLane = (rows, label, hoverPrefix) => {
+    const i = nearestIdx(rows);
+    const r = (i >= 0) ? rows[i] : null;
+    return {
+      x: r ? [`${r.date}T${r.time || "00:00:00"}Z`] : [],
+      y: r ? [label] : [],
+      customdata: r ? [r.date] : [],
+      text: r ? [`${hoverPrefix} ${r.date} ${(r.time||"").slice(0,5)}  ← selected`] : [],
+      hovertemplate: "%{text}<extra></extra>",
+      mode: "markers", type: "scatter",
+      marker: { size: 16, color: "#ef4444", line: { color: "#7f1d1d", width: 2.5 } },
+      name: label + " (selected)", showlegend: false,
+    };
+  };
+
+  const traces = [];
+  [["Satellite", satRows,   `${satSrc.toUpperCase()} ${satProdKey.toUpperCase()}`],
+   ["UAV",       uavRows,   `UAV ${uavProd.toUpperCase()}`],
+   ["NISAR",     nisarRows, `NISAR ${nProd.toUpperCase()}`]
+  ].forEach(([label, rows, prefix]) => {
+    traces.push(baseLane(rows, label, prefix));
+    traces.push(hiLane(rows, label, prefix));
+  });
+
+  // mirror the main chart's x-axis exactly — same domain (plot-area edges)
+  // AND same range (date bounds). This makes the strip's red highlight
+  // sit at the same pixel column as the chart's vertical date marker, so
+  // they're visually aligned no matter how the chart is zoomed/panned.
+  const main = document.getElementById("chart");
+  const mainFL = main && main._fullLayout && main._fullLayout.xaxis;
+  const xDomain = (mainFL && mainFL.domain) ? mainFL.domain : [0, 1];
+  const xRange  = (mainFL && mainFL.range)  ? mainFL.range  : undefined;
+
+  // Use Plotly.newPlot (not react) to force a full re-render. Plotly.react's
+  // diffing was preserving stale highlight positions across overlay-date
+  // changes — particularly for lanes whose data didn't change shape.
+  // The strip is small, so a full re-render is cheap.
+  Plotly.newPlot("sceneStrip", traces, {
+    margin: { l: 65, r: 70, t: 4, b: 18 },
+    xaxis: {
+      type: "date", showgrid: false,
+      domain: xDomain, range: xRange,
+      fixedrange: true,                              // strip itself isn't pannable
+    },
+    yaxis: {
+      type: "category", categoryorder: "array",
+      categoryarray: ["NISAR", "UAV", "Satellite"],
+      tickfont: { size: 10 }, fixedrange: true, automargin: true,
+    },
+    plot_bgcolor: "#fff", paper_bgcolor: "#fff",
+    showlegend: false,
+  }, { responsive: true, displaylogo: false, displayModeBar: false });
+
+  // newPlot recreates the chart's internal event emitter, so re-attach the
+  // click handler on every render (otherwise clicks stop firing after the
+  // first re-render).
+  stripEl.on("plotly_click", (ev) => {
+    const pt = ev.points && ev.points[0];
+    if (!pt || !pt.customdata) return;
+    const di = document.getElementById("overlayDate");
+    di.value = pt.customdata;
+    applyOverlay();                                 // dots, layers, marker, strip
+  });
+
+  // chart pan/zoom → strip domain mirroring is handled by
+  // chartRelayoutHandler (see wireChartRelayout in renderChart).
+}
+
+// keep the chart sized to its container
+window.addEventListener("resize", () => {
+  const el = document.getElementById("chart");
+  if (el && el.data) Plotly.Plots.resize(el);
+});
+
+document.getElementById("applyDate").addEventListener("click", renderChart);
+
+// overlay date + layer toggles + UAV product + satellite product + NISAR
+["overlayDate", "layerStations",
+ "layerUAV", "uavProduct",
+ "layerSat", "satProduct",
+ "layerNisar", "nisarProduct",
+].forEach(id => {
+  document.getElementById(id).addEventListener("change", applyOverlay);
+});
+// date input: also bind "input" — some browsers don't fire "change" until
+// blur when stepping with the spinner arrows.
+document.getElementById("overlayDate").addEventListener("input", applyOverlay);
+
+// NISAR opacity slider (live update)
+document.getElementById("nisarOpacity").addEventListener("input", e => {
+  document.getElementById("nisarOpacityVal").textContent = `${e.target.value}%`;
+  if (nisarLayer) nisarLayer.setOpacity(+e.target.value / 100);
+});
+
+// satellite interpolation toggle (off → crisp MODIS pixels via CSS class)
+document.getElementById("satInterpolate").addEventListener("change", e => {
+  const pane = map.getPane("satellitePane");
+  if (e.target.checked) pane.classList.remove("pane-pixelated");
+  else                  pane.classList.add("pane-pixelated");
+});
+
+// UAV interpolation toggle — same mechanism as satellite. Default off so
+// the actual pixel grid shows (especially useful for the 25 m L-band SM).
+document.getElementById("uavInterpolate").addEventListener("change", e => {
+  const pane = map.getPane("uavPane");
+  if (e.target.checked) pane.classList.remove("pane-pixelated");
+  else                  pane.classList.add("pane-pixelated");
+});
+
+// satellite opacity slider — live update
+document.getElementById("satOpacity").addEventListener("input", e => {
+  document.getElementById("satOpacityVal").textContent = `${e.target.value}%`;
+  if (satLayer) satLayer.setOpacity(+e.target.value / 100);
+});
+
+// UAV opacity slider — live update across the In-situ tab's single layer AND
+// every multi-layer overlay added from the UAVs tab.
+document.getElementById("uavOpacity").addEventListener("input", e => {
+  document.getElementById("uavOpacityVal").textContent = `${e.target.value}%`;
+  const op = +e.target.value / 100;
+  if (uavLayer) uavLayer.setOpacity(op);
+  uavLayers.forEach(l => l.setOpacity(op));
+});
+
+// basemap selector + opacity
+document.getElementById("basemapSelect").addEventListener("change", applyBasemap);
+document.getElementById("basemapOpacity").addEventListener("input", e => {
+  setBasemapOpacity(+e.target.value);
+});
+
+// =============================================================
+// Downloads
+// =============================================================
+document.getElementById("downloadOne").addEventListener("click", () => {
+  if (!currentStation) return alert("Select a station first.");
+  const a = document.createElement("a");
+  // serve the full-resolution raw 5-min file for downloads (chart uses hourly)
+  const file = `${currentStation.station_id.replace(/-/g, "_")}.csv`;
+  a.href = `${TS_DIR_RAW}/${file}`;
+  a.download = file;
+  a.click();
+});
+
+document.getElementById("downloadAll").addEventListener("click", () => {
+  // simple approach: open a request form. Replace with your URL or mailto.
+  const subject = encodeURIComponent("HydroAI - Hampyeong bulk data request");
+  const body = encodeURIComponent(
+    "Name:\nAffiliation:\nIntended use:\nVariables needed:\nTime range:\n"
+  );
+  window.location.href = `mailto:hyunglokkim@gmail.com?subject=${subject}&body=${body}`;
+});
+
+// UAVs tab — download every currently-selected overlay's PNG. Browsers
+// throttle simultaneous downloads, so trigger them with a small stagger.
+document.getElementById("uavDownloadSelected")?.addEventListener("click", () => {
+  if (uavSelections.size === 0) {
+    alert("No flights selected. Pick a date with a flight in the calendar first.");
+    return;
+  }
+  let i = 0;
+  uavSelections.forEach(row => {
+    setTimeout(() => {
+      const a = document.createElement("a");
+      a.href = `data/uav/${row.file}`;
+      a.download = row.file;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }, i * 350);
+    i++;
+  });
+});
+
+// UAVs tab — bulk-request raw NC files (mailto), pre-filling current selection.
+document.getElementById("uavRequestRaw")?.addEventListener("click", () => {
+  const lines = [...uavSelections.values()].map(r =>
+    `  - ${r.date} ${r.product.toUpperCase()} (${r.resolution_m} m)`
+  ).join("\n");
+  const selBlock = lines.length
+    ? `\nCurrently selected on the map:\n${lines}\n`
+    : "\n(No specific selection — please describe the dates / products you need.)\n";
+  const subject = encodeURIComponent("HydroAI - Hampyeong UAV raw NC request");
+  const body    = encodeURIComponent(
+    "Name:\nAffiliation:\nIntended use:\n" + selBlock
+  );
+  window.location.href = `mailto:hyunglokkim@gmail.com?subject=${subject}&body=${body}`;
+});
+
+// =============================================================
+// Tabs — map stays visible across tabs; only the right side-panel swaps
+// =============================================================
+document.querySelectorAll(".tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    const t = btn.dataset.tab;
+    ["insitu","uav","sat","model","ai","pic","support"].forEach(name => {
+      const sp = document.getElementById(`side-${name}`);
+      if (sp) sp.style.display = (name === t) ? "" : "none";
+    });
+    // Pictures tab swaps the leaflet map column for a gallery column;
+    // every other tab keeps the map visible.
+    const showPic = (t === "pic");
+    document.getElementById("mapCol").style.display    = showPic ? "none" : "";
+    document.getElementById("picMainCol").style.display = showPic ? "" : "none";
+
+    if (!showPic) {
+      map.invalidateSize();                            // map div size may have changed
+    }
+    if (t === "uav") {
+      ensureLbandLoaded();                             // lazy-load catalog on first visit
+    }
+    if (t === "pic") {
+      ensurePicturesLoaded();                          // lazy-load pictures catalog
+    }
+    // NOTE: do NOT clear L-band overlays on tab switch — they should persist
+    // across tabs unless the user explicitly removes them in the UAVs tab.
+  });
+});
+
+// =============================================================
+// Pictures tab — folder navigation + gallery + lightbox
+// =============================================================
+let _picturesCatalog = null;
+let _picturesActive  = null;     // active folder object
+function ensurePicturesLoaded() {
+  if (_picturesCatalog) return;
+  fetch("data/pictures/catalog.json")
+    .then(r => r.ok ? r.json() : { folders: [] })
+    .then(cat => {
+      _picturesCatalog = cat;
+      renderPicturesFolderList();
+      // Auto-open the most recent folder if any
+      const folders = (cat && cat.folders) || [];
+      if (folders.length) selectPicturesFolder(folders[0].folder);
+    })
+    .catch(() => {
+      _picturesCatalog = { folders: [] };
+      renderPicturesFolderList();
+    });
+}
+
+function renderPicturesFolderList() {
+  const list = document.getElementById("picFolderList");
+  if (!list) return;
+  const folders = (_picturesCatalog && _picturesCatalog.folders) || [];
+  if (!folders.length) {
+    list.innerHTML = `<div class="pic-folder-empty">No visits catalogued yet.</div>`;
+    return;
+  }
+  list.innerHTML = "";
+  folders.forEach(f => {
+    const row = document.createElement("div");
+    row.className = "pic-folder-row" + (_picturesActive && _picturesActive.folder === f.folder ? " active" : "");
+    row.innerHTML =
+      `<span class="pic-folder-title">${escapeHtml(f.title)}</span>` +
+      `<span class="pic-folder-meta">${f.date} · ${f.images.length} photo${f.images.length === 1 ? "" : "s"}</span>`;
+    row.addEventListener("click", () => selectPicturesFolder(f.folder));
+    list.appendChild(row);
+  });
+}
+
+function selectPicturesFolder(folderName) {
+  const folders = (_picturesCatalog && _picturesCatalog.folders) || [];
+  const f = folders.find(x => x.folder === folderName);
+  if (!f) return;
+  _picturesActive = f;
+  renderPicturesFolderList();
+  renderPicturesGallery(f);
+}
+
+function renderPicturesGallery(folder) {
+  const titleEl = document.getElementById("picGalleryTitle");
+  const subEl   = document.getElementById("picGallerySubtitle");
+  const grid    = document.getElementById("picGallery");
+  if (titleEl) titleEl.textContent = folder.title;
+  if (subEl)   subEl.textContent   = `${folder.date} · ${folder.images.length} photo${folder.images.length === 1 ? "" : "s"}`;
+  if (!grid) return;
+  grid.innerHTML = "";
+  folder.images.forEach((img, idx) => {
+    const fig = document.createElement("div");
+    fig.className = "pic-thumb";
+    fig.innerHTML = `<img src="${picUrl(folder, img)}" alt="${escapeHtml(img)}" loading="lazy">`;
+    fig.addEventListener("click", () => openLightbox(folder, idx));
+    grid.appendChild(fig);
+  });
+}
+
+function picUrl(folder, img) {
+  const sub = folder.subdir ? `/${encodeURIComponent(folder.subdir)}` : "";
+  return `data/pictures/${encodeURIComponent(folder.folder)}${sub}/${encodeURIComponent(img)}`;
+}
+
+let _lbFolder = null, _lbIdx = 0;
+function openLightbox(folder, idx) {
+  _lbFolder = folder; _lbIdx = idx;
+  document.getElementById("picLightbox").style.display = "flex";
+  showLightboxImage();
+}
+function closeLightbox() {
+  document.getElementById("picLightbox").style.display = "none";
+  _lbFolder = null;
+}
+function lightboxStep(d) {
+  if (!_lbFolder) return;
+  _lbIdx = (_lbIdx + d + _lbFolder.images.length) % _lbFolder.images.length;
+  showLightboxImage();
+}
+function showLightboxImage() {
+  const f = _lbFolder; if (!f) return;
+  const name = f.images[_lbIdx];
+  document.getElementById("picLbImg").src = picUrl(f, name);
+  document.getElementById("picLbCaption").textContent =
+    `${f.title}  ·  ${name}  (${_lbIdx + 1} / ${f.images.length})`;
+}
+document.getElementById("picLbClose")?.addEventListener("click", closeLightbox);
+document.getElementById("picLbPrev")?.addEventListener("click",  () => lightboxStep(-1));
+document.getElementById("picLbNext")?.addEventListener("click",  () => lightboxStep(+1));
+document.getElementById("picLightbox")?.addEventListener("click", e => {
+  if (e.target.id === "picLightbox") closeLightbox();           // backdrop click
+});
+document.addEventListener("keydown", e => {
+  if (document.getElementById("picLightbox").style.display === "none") return;
+  if (e.key === "Escape")     closeLightbox();
+  else if (e.key === "ArrowLeft")  lightboxStep(-1);
+  else if (e.key === "ArrowRight") lightboxStep(+1);
+});
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  })[c]);
+}
+
+// Always-visible "♥ Donate" link in the header → jumps to Support tab.
+document.getElementById("creditDonateLink")?.addEventListener("click", e => {
+  e.preventDefault();
+  document.querySelector('.tab[data-tab="support"]')?.click();
+});
+
+// "Clear" button in the UAVs flight list — removes every UAV overlay this
+// tab has put on the map (both the multi-layer selections and the legacy
+// L-band catalog.json selection if any) and resets selection state.
+document.getElementById("uavClearSelections")?.addEventListener("click", () => {
+  uavLayers.forEach(l => map.removeLayer(l));
+  uavLayers.clear();
+  uavSelections.clear();
+  uavLastClickedKey = null;
+  // Legacy L-band (catalog.json patches) selection, if any, also clears.
+  if (typeof lbandSelectedDates !== "undefined") {
+    lbandSelectedDates.clear();
+    if (typeof drawLbandOverlays === "function") drawLbandOverlays();
+  }
+  // Hide L-band per-flight cards that only make sense with a selection.
+  ["lbandCalibCard", "lbandSelectorCard"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = "none";
+  });
+  // Reset the In-situ tab's single UAV layer too — most users expect "Clear"
+  // to leave the map free of UAV overlays.
+  const cb = document.getElementById("layerUAV");
+  if (cb) cb.checked = false;
+  applyOverlay();
+  renderLbandCalendar();
+  // Friendly empty-state info
+  const info = document.getElementById("lbandFlightInfo");
+  if (info) {
+    info.innerHTML = `<span style="color:var(--muted);">Pick a date with a flight to view it on the In-situ map.</span>`;
+  }
+});
+
+// =============================================================
+// L-band radiometer (UAVs tab)
+// =============================================================
+let lbandCatalog = null;            // parsed catalog.json
+let lbandFlightsByDate = {};        // YYYY-MM-DD → flight obj
+let lbandCalDate = new Date();      // currently displayed month (1st of month is what matters)
+let lbandSelectedDates = new Set();   // YYYY-MM-DD strings — multi-select
+let lbandLayers = [];               // active Leaflet layers for the current selection
+
+// One-time calendar month jump: land on whichever month contains the most
+// recent UAV flight (across ALL product types). Called once when the UAV
+// catalog finishes loading. Subsequent product-pill switches don't touch
+// lbandCalDate — the user keeps whatever month they navigated to.
+let _uavCalInitDone = false;
+function initUavCalendarMonth() {
+  if (_uavCalInitDone) return;
+  if (!uavCatalog.length) return;
+  const dates = uavCatalog.map(r => r.date).filter(Boolean).sort();
+  if (!dates.length) return;
+  const last = new Date(dates[dates.length - 1] + "T00:00:00");
+  lbandCalDate = new Date(last.getFullYear(), last.getMonth(), 1);
+  _uavCalInitDone = true;
+}
+
+function ensureLbandLoaded() {
+  if (lbandCatalog) {
+    renderLbandCalendar();
+    return;
+  }
+  fetch("data/uav/lband/catalog.json")
+    .then(r => {
+      if (!r.ok) throw new Error("missing");        // 404 → empty fallback below
+      return r.json();
+    })
+    .then(cat => {
+      lbandCatalog = cat;
+      lbandFlightsByDate = {};
+      (cat.flights || []).forEach(f => { lbandFlightsByDate[f.date] = f; });
+      // open the calendar at the most recent flight by default
+      const dates = Object.keys(lbandFlightsByDate).sort();
+      if (dates.length) {
+        const last = new Date(dates[dates.length - 1] + "T00:00:00");
+        lbandCalDate = new Date(last.getFullYear(), last.getMonth(), 1);
+      }
+      renderLbandCalendar();
+    })
+    .catch(() => {
+      // No L-band catalog yet — set an empty stub so we don't refetch on
+      // every pill switch, and render the calendar grid with the standard
+      // "no flights catalogued" hint (handled in renderLbandCalendar).
+      lbandCatalog = { flights: [] };
+      lbandFlightsByDate = {};
+      renderLbandCalendar();
+    });
+}
+
+const MONTH_NAMES = ["January","February","March","April","May","June",
+                     "July","August","September","October","November","December"];
+
+// Chronological flight list (right of the calendar). Re-rendered whenever
+// the catalog loads, the selection changes, or the payload switches.
+// Multi-select state for UAV imagery / PolRA products. Selections persist
+// across product switches in the UAVs tab — clicking RGB→04-30 then
+// NDVI→04-30 leaves BOTH overlays on the In-situ map. Each selection key
+// is "{product}_{YYYY-MM-DD}" so the same date with different products is
+// treated as separate.
+const uavSelections = new Map();   // selKey → catalog row
+const uavLayers     = new Map();   // selKey → Leaflet imageOverlay
+let uavLastClickedKey = null;
+
+function _resolveProductKey(payload) {
+  // L-band pill is a meta-payload — actual product comes from the PolRA radio.
+  if (payload === "lband") {
+    const r = document.querySelector('input[name="polraProduct"]:checked');
+    return r ? r.value : "sm_retr";
+  }
+  return payload;
+}
+
+// Selection keys: per pill, not per product. For lband the sub-product
+// (sm_retr/sm_lgb/tb_v/tb_h) lives in the radio buttons and changing it
+// swaps the underlying layer without touching the selection set.
+function _selKey(payload, date) {
+  return `${payload}_${date}`;
+}
+
+function isSelectedForPayload(dateStr, payload) {
+  return uavSelections.has(_selKey(payload, dateStr));
+}
+
+// Build a {date → flight obj} map for the given payload.
+// - L-band: prefer the legacy catalog.json (multi-patch / multi-resolution
+//   structure) when it has flights; otherwise fall back to uavCatalog rows
+//   whose source==='lband' (e.g. PolRA-derived sm_retr/sm_lgb/tb_v/tb_h).
+// - Other payloads: group uavCatalog rows by date so each flight day shows
+//   up regardless of how many products were captured that day.
+function flightsForPayload(payload) {
+  if (payload === "lband") {
+    const fromJson = lbandFlightsByDate || {};
+    if (Object.keys(fromJson).length) return fromJson;
+    const rows = uavCatalog.filter(r => String(r.source || "").toLowerCase() === "lband");
+    const out = {};
+    rows.forEach(r => {
+      if (!out[r.date]) out[r.date] = { date: r.date, time: r.time || "", rows: [] };
+      out[r.date].rows.push(r);
+    });
+    return out;
+  }
+  const rows = uavCatalog.filter(r => r.product === payload);
+  const out = {};
+  rows.forEach(r => {
+    if (!out[r.date]) out[r.date] = { date: r.date, time: r.time || "", rows: [] };
+    out[r.date].rows.push(r);
+  });
+  return out;
+}
+
+function renderUavFlightList() {
+  const list = document.getElementById("uavFlightList");
+  const counter = document.getElementById("uavFlightSelectedCount");
+  if (!list) return;
+
+  const flightsByDate = flightsForPayload(uavPayload);
+  const dates = Object.keys(flightsByDate).sort().reverse();   // newest first
+
+  list.innerHTML = "";
+  if (!dates.length) {
+    list.innerHTML = `<div class="uav-flight-list-empty">No flights catalogued for this payload yet.</div>`;
+    counter.textContent = "";
+    return;
+  }
+
+  dates.forEach(d => {
+    const fl = flightsByDate[d];
+    const lbandHasJson = uavPayload === "lband" && Object.keys(lbandFlightsByDate || {}).length > 0;
+    const sel = lbandHasJson
+      ? lbandSelectedDates.has(d)
+      : isSelectedForPayload(d, uavPayload);
+    const row = document.createElement("div");
+    row.className = "uav-flight-row" + (sel ? " selected" : "");
+    row.innerHTML = `
+      <span class="uav-flight-check"></span>
+      <span class="uav-flight-date">${d}</span>
+      <span class="uav-flight-time">${(fl.time || "").slice(0,5)} UTC</span>
+    `;
+    row.title = `${d} ${fl.time || ""} UTC`;
+    if (uavPayload === "lband" && Object.keys(lbandFlightsByDate || {}).length > 0) {
+      row.addEventListener("click", () => selectLbandFlight(d));
+    } else {
+      row.addEventListener("click", () => selectUavFlight(d, uavPayload));
+    }
+    list.appendChild(row);
+  });
+
+  const n = lbandSelectedDates.size;
+  counter.textContent = (uavPayload === "lband")
+    ? (n === 0 ? "0 selected" : `${n} selected`)
+    : "";
+}
+
+// Multi-layer overlay flow for UAVs tab: every (product, date) selection
+// adds its own imageOverlay onto the shared In-situ leaflet map and stays
+// there until the user clicks the same day again to deselect. Switching
+// product pills DOES NOT clear prior selections — RGB-04-30 + NDVI-04-30
+// can coexist on the map (later one stacks on top; tune via opacity/interp).
+function selectUavFlight(dateStr, payload) {
+  const productKey = _resolveProductKey(payload);
+  const selKey = _selKey(payload, dateStr);
+
+  if (uavSelections.has(selKey)) {
+    // Deselect → remove the corresponding leaflet layer.
+    uavSelections.delete(selKey);
+    const layer = uavLayers.get(selKey);
+    if (layer) { map.removeLayer(layer); uavLayers.delete(selKey); }
+    if (uavLastClickedKey === selKey) uavLastClickedKey = null;
+  } else {
+    // Select → look up the catalog row and add a new layer.
+    const row = uavCatalog.find(r => r.date === dateStr && r.product === productKey);
+    if (!row) {
+      console.warn(`[uav] no catalog row for ${selKey} (resolved product=${productKey})`);
+      return;
+    }
+    const bounds = [[+row.s, +row.w], [+row.n, +row.e]];
+    const op = +(document.getElementById("uavOpacity")?.value || 80) / 100;
+    const layer = L.imageOverlay(`data/uav/${row.file}`, bounds, {
+      opacity: op, interactive: false, pane: "uavPane",
+    }).addTo(map);
+    uavSelections.set(selKey, row);
+    uavLayers.set(selKey, layer);
+    uavLastClickedKey = selKey;
+  }
+
+  renderLbandCalendar();   // re-paint calendar + list selection highlights
+
+  // Sync In-situ tab controls to the most recently clicked selection so the
+  // In-situ map shows it as its single layer too (consistent with other
+  // selection mechanisms on that tab). When deselecting all, turn off the
+  // In-situ UAV toggle.
+  const cb  = document.getElementById("layerUAV");
+  const di  = document.getElementById("overlayDate");
+  const sel = document.getElementById("uavProduct");
+  // If the most-recently-clicked key was just deselected, fall back to any
+  // other still-active selection so the In-situ legend + single overlay
+  // stay in sync with what's still on the map. Only when every selection
+  // is gone do we turn the In-situ UAV toggle off.
+  if (!uavLastClickedKey || !uavSelections.has(uavLastClickedKey)) {
+    uavLastClickedKey = uavSelections.size ? [...uavSelections.keys()].pop() : null;
+  }
+  if (uavLastClickedKey) {
+    const row = uavSelections.get(uavLastClickedKey);
+    if (di) di.value = row.date;
+    if (sel && [...sel.options].some(o => o.value === row.product)) sel.value = row.product;
+    if (cb) cb.checked = true;
+  } else if (cb) {
+    cb.checked = false;
+  }
+  applyOverlay();
+
+  // Info text
+  const info = document.getElementById("lbandFlightInfo");
+  if (!info) return;
+  if (uavSelections.size === 0) {
+    info.innerHTML = `<span style="color:var(--muted);">Pick a date with a flight to view it on the In-situ map.</span>`;
+    return;
+  }
+  const lines = [...uavSelections.entries()]
+    .sort(([a], [b]) => a < b ? -1 : 1)
+    .map(([k, row]) => {
+      const star = (k === uavLastClickedKey) ? " ★" : "";
+      return `<div><b>${row.date}</b> ${row.time || ""} — ${row.product.toUpperCase()} (${row.resolution_m} m)${star}</div>`;
+    }).join("");
+  info.innerHTML =
+    `<div style="font-size:13px;line-height:1.55;">${lines}</div>` +
+    `<div style="font-size:11px;color:var(--muted);margin-top:6px;">` +
+    `${uavSelections.size} overlay(s) on map. ★ = most recent. ` +
+    `Click a highlighted day again to remove its overlay.</div>`;
+}
+
+function renderLbandCalendar() {
+  const cal = document.getElementById("lbandCalendar");
+  const label = document.getElementById("lbandCalLabel");
+  if (!cal) return;
+  const year  = lbandCalDate.getFullYear();
+  const month = lbandCalDate.getMonth();
+  // Manually format — toLocaleString returned empty in the dark-theme render
+  if (label) label.textContent = `${MONTH_NAMES[month]} ${year}`;
+
+  cal.innerHTML = "";
+  // header row: day names
+  ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].forEach(d => {
+    const dn = document.createElement("div");
+    dn.className = "lband-dow"; dn.textContent = d;
+    cal.appendChild(dn);
+  });
+
+  // Pick the date-source for the active payload.
+  const flightsByDate = flightsForPayload(uavPayload);
+  const hint = document.getElementById("lbandCalHint");
+  if (hint) {
+    if (uavPayload === "lband") {
+      hint.textContent = Object.keys(flightsByDate).length
+        ? "Red-filled days have a flight. Click to add/remove from the map."
+        : "No L-band flights catalogued yet.";
+    } else if (Object.keys(flightsByDate).length) {
+      hint.textContent = `Red-filled days have a ${PAYLOAD_TITLE[uavPayload]} flight. Click to view it on the In-situ map.`;
+    } else {
+      hint.textContent = `${PAYLOAD_TITLE[uavPayload]}: no flights catalogued for this payload yet.`;
+    }
+  }
+
+  // grid: start with the Sunday on/before the 1st
+  const first = new Date(year, month, 1);
+  const start = new Date(year, month, 1 - first.getDay());
+  const todayStr = new Date().toISOString().slice(0,10);
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    const cell = document.createElement("div");
+    cell.className = "lband-day";
+    cell.textContent = d.getDate();
+    if (d.getMonth() !== month)         cell.classList.add("lband-other");
+    if (ds === todayStr)                cell.classList.add("lband-today");
+    if (flightsByDate[ds]) {
+      cell.classList.add("lband-flight");
+      cell.title = `Flight on ${ds}`;
+      // lband + json catalog → multi-patch flow; otherwise the simple
+      // single-overlay flow (also used by RGB/TIR/NDVI/NDWI/LiDAR).
+      if (uavPayload === "lband" && Object.keys(lbandFlightsByDate || {}).length > 0) {
+        cell.addEventListener("click", () => selectLbandFlight(ds));
+      } else {
+        cell.addEventListener("click", () => selectUavFlight(ds, uavPayload));
+      }
+    }
+    // The lband payload has TWO selection modes:
+    //   1. legacy catalog.json populated → multi-patch flow (selectLbandFlight)
+    //   2. catalog.csv fallback (e.g. PolRA NCs) → multi-(product,date) flow
+    //      shared with the other UAV payloads (selectUavFlight)
+    const lbandHasJson = uavPayload === "lband" && Object.keys(lbandFlightsByDate || {}).length > 0;
+    if (lbandHasJson && lbandSelectedDates.has(ds)) {
+      cell.classList.add("lband-selected");
+    } else if (!lbandHasJson && isSelectedForPayload(ds, uavPayload)) {
+      cell.classList.add("lband-selected");
+    }
+    cal.appendChild(cell);
+  }
+  renderUavFlightList();
+}
+
+function selectLbandFlight(dateStr) {
+  // toggle membership — click to add, click again to remove
+  if (lbandSelectedDates.has(dateStr)) lbandSelectedDates.delete(dateStr);
+  else                                  lbandSelectedDates.add(dateStr);
+
+  renderLbandCalendar();                              // re-paint highlights
+
+  // build the multi-flight info string (sorted by date)
+  const sel = [...lbandSelectedDates].sort();
+  const info = document.getElementById("lbandFlightInfo");
+  if (sel.length === 0) {
+    info.innerHTML = `<span style="color:var(--muted);">Pick one or more dates with flights.</span>`;
+    document.getElementById("lbandSelectorCard").style.display = "none";
+    document.getElementById("lbandCalibCard").style.display    = "none";
+  } else {
+    const lines = sel.map(d => {
+      const f = lbandFlightsByDate[d];
+      return `<div><b>${d}</b> ${f.time} UTC — ${f.patches.length} patch(es): ${f.patches.map(p => p.id).join(", ")}</div>`;
+    });
+    info.innerHTML = `<div style="font-size:13px;line-height:1.55;">${lines.join("")}</div>` +
+      `<div style="font-size:11px;color:var(--muted);margin-top:6px;">${sel.length} flight(s) selected — click a highlighted day again to deselect.</div>`;
+    document.getElementById("lbandSelectorCard").style.display = "";
+    document.getElementById("lbandCalibCard").style.display    = "";
+  }
+
+  drawLbandOverlays();
+
+  // align the global Overlay date with the most recently picked flight
+  const di = document.getElementById("overlayDate");
+  if (di && lbandSelectedDates.has(dateStr) && di.value !== dateStr) {
+    di.value = dateStr;
+    applyOverlay();
+  }
+  // pan/fit map to the just-toggled flight (only when adding, not removing)
+  const fl = lbandFlightsByDate[dateStr];
+  if (lbandSelectedDates.has(dateStr) && fl && fl.patches.length && window.map) {
+    const b = fl.patches[0].bounds;
+    map.fitBounds([[b.s, b.w], [b.n, b.e]], { padding: [30, 30], maxZoom: 17 });
+  }
+}
+
+function clearLbandOverlays() {
+  lbandLayers.forEach(L_layer => { try { map.removeLayer(L_layer); } catch (e) {} });
+  lbandLayers = [];
+}
+
+// Spec for the L-band legend (matches nc_to_overlay.py PRODUCT_CMAP).
+const LBAND_LEGEND = {
+  TB_V: { label: "TB V", min: 200, max: 280, unit: "K",
+          gradient: "linear-gradient(to right, rgb(15,50,130), rgb(40,130,230), rgb(120,200,200), rgb(210,230,110), rgb(255,220,60), rgb(240,130,40), rgb(200,30,30))" },
+  TB_H: { label: "TB H", min: 200, max: 280, unit: "K",
+          gradient: "linear-gradient(to right, rgb(15,50,130), rgb(40,130,230), rgb(120,200,200), rgb(210,230,110), rgb(255,220,60), rgb(240,130,40), rgb(200,30,30))" },
+  SM:   { label: "Soil moisture", min: 0.05, max: 0.55, unit: "m³/m³",
+          gradient: "linear-gradient(to right, rgb(120,60,20), rgb(220,160,60), rgb(80,170,220), rgb(20,60,160))" },
+};
+
+function drawLbandLegend(variable) {
+  const el = document.getElementById("lbandLegend");
+  if (!el) return;
+  const cb = LBAND_LEGEND[variable];
+  el.innerHTML = `
+    <span class="cb-prefix">${cb.label}</span>
+    <span class="cb-min">${cb.min}</span>
+    <div class="cb-gradient" style="background:${cb.gradient}"></div>
+    <span class="cb-max">${cb.max} ${cb.unit}</span>`;
+}
+
+function drawLbandOverlays() {
+  clearLbandOverlays();
+  if (lbandSelectedDates.size === 0) return;
+
+  const variable = document.querySelector('input[name="lbandVar"]:checked').value;   // TB_V / TB_H / SM
+  const showRaw  = document.getElementById("lbandShowRaw").checked;
+  const show200m = document.getElementById("lbandShow200m").checked;
+  const show10m  = document.getElementById("lbandShow10m").checked;
+  const show30cm = document.getElementById("lbandShow30cm").checked;
+  const op       = +document.getElementById("lbandOpacity").value / 100;
+  drawLbandLegend(variable);
+
+  // Iterate over every selected flight; each flight's patches get drawn.
+  // Order: coarsest first (bottom), finest last (top), so when multiple
+  // resolutions are toggled the finer one sits on top of the same patch.
+  lbandSelectedDates.forEach(dateStr => {
+    const fl = lbandFlightsByDate[dateStr];
+    if (!fl) return;
+    fl.patches.forEach(pt => {
+      const b = pt.bounds;
+      const addImg = (resKey) => {
+        const m = pt[`${resKey}_png`];
+        if (!m || !m[variable]) return;
+        const lyr = L.imageOverlay(`data/${m[variable]}`,
+                    [[b.s, b.w], [b.n, b.e]],
+                    { opacity: op, interactive: false, pane: "uavPane",
+                      className: "lband-overlay" }).addTo(map);
+        lbandLayers.push(lyr);
+      };
+      if (show200m) addImg("200m");
+      if (show10m)  addImg("10m");
+      if (show30cm) addImg("30cm");
+
+      if (showRaw && pt.raw_file) {
+        // Raw flight track = GPS locations only. No values, no coloring.
+        Papa.parse(`data/${pt.raw_file}`, {
+          download: true, header: true, dynamicTyping: true, skipEmptyLines: true,
+          complete: (res) => {
+            if (!lbandSelectedDates.has(dateStr)) return;     // selection changed mid-fetch
+            res.data.forEach(r => {
+              if (r.lat == null || r.lon == null) return;
+              const m = L.circleMarker([+r.lat, +r.lon], {
+                radius: 2, color: "#111", weight: 0.6,
+                fillColor: "#fff", fillOpacity: 0.85, pane: "uavPane",
+              }).addTo(map);
+              if (r.time) m.bindTooltip(`UAV ${dateStr} @ ${r.time}`, { className: "lband-tip" });
+              lbandLayers.push(m);
+            });
+          },
+        });
+      }
+    });
+  });
+}
+
+// L-band controls wiring
+document.getElementById("lbandCalPrev").addEventListener("click", () => {
+  lbandCalDate = new Date(lbandCalDate.getFullYear(), lbandCalDate.getMonth() - 1, 1);
+  renderLbandCalendar();
+});
+document.getElementById("lbandCalNext").addEventListener("click", () => {
+  lbandCalDate = new Date(lbandCalDate.getFullYear(), lbandCalDate.getMonth() + 1, 1);
+  renderLbandCalendar();
+});
+document.getElementById("lbandCalToday").addEventListener("click", () => {
+  lbandCalDate = new Date();
+  lbandCalDate = new Date(lbandCalDate.getFullYear(), lbandCalDate.getMonth(), 1);
+  renderLbandCalendar();
+});
+
+// Click the month/year label → reveal year+month dropdowns. The year range
+// spans every catalog flight ± 1 year so the user can navigate to any month
+// with data plus a little buffer.
+function openCalPicker() {
+  const label  = document.getElementById("lbandCalLabel");
+  const picker = document.getElementById("lbandCalPicker");
+  const monSel = document.getElementById("lbandCalMonthSel");
+  const yrSel  = document.getElementById("lbandCalYearSel");
+
+  // populate months
+  monSel.innerHTML = "";
+  MONTH_NAMES.forEach((name, i) => {
+    const o = document.createElement("option");
+    o.value = i; o.textContent = name;
+    if (i === lbandCalDate.getMonth()) o.selected = true;
+    monSel.appendChild(o);
+  });
+  // populate years (catalog dates ± 1, fallback to current ± 2)
+  let yMin, yMax;
+  const dates = lbandCatalog ? Object.keys(lbandFlightsByDate) : [];
+  if (dates.length) {
+    const ys = dates.map(d => +d.slice(0, 4));
+    yMin = Math.min(...ys) - 1;
+    yMax = Math.max(...ys) + 1;
+  } else {
+    const ynow = new Date().getFullYear();
+    yMin = ynow - 2; yMax = ynow + 2;
+  }
+  yrSel.innerHTML = "";
+  for (let y = yMin; y <= yMax; y++) {
+    const o = document.createElement("option");
+    o.value = y; o.textContent = y;
+    if (y === lbandCalDate.getFullYear()) o.selected = true;
+    yrSel.appendChild(o);
+  }
+
+  label.style.display = "none";
+  picker.style.display = "flex";
+  monSel.focus();
+}
+function closeCalPicker() {
+  document.getElementById("lbandCalPicker").style.display = "none";
+  document.getElementById("lbandCalLabel").style.display  = "";
+}
+document.getElementById("lbandCalLabel").addEventListener("click", openCalPicker);
+function applyCalPicker() {
+  const m = +document.getElementById("lbandCalMonthSel").value;
+  const y = +document.getElementById("lbandCalYearSel").value;
+  lbandCalDate = new Date(y, m, 1);
+  closeCalPicker();
+  renderLbandCalendar();
+}
+document.getElementById("lbandCalMonthSel").addEventListener("change", applyCalPicker);
+document.getElementById("lbandCalYearSel" ).addEventListener("change", applyCalPicker);
+// click outside the picker → close it
+document.addEventListener("click", (ev) => {
+  const picker = document.getElementById("lbandCalPicker");
+  if (picker.style.display === "none") return;
+  if (picker.contains(ev.target) || ev.target.id === "lbandCalLabel") return;
+  closeCalPicker();
+});
+document.querySelectorAll('input[name="lbandVar"]').forEach(r =>
+  r.addEventListener("change", drawLbandOverlays));
+["lbandShowRaw", "lbandShow200m", "lbandShow10m", "lbandShow30cm"].forEach(id =>
+  document.getElementById(id).addEventListener("change", drawLbandOverlays));
+document.getElementById("lbandOpacity").addEventListener("input", e => {
+  document.getElementById("lbandOpacityVal").textContent = `${e.target.value}%`;
+  drawLbandOverlays();
+});
+
+// =============================================================
+// UAVs payload selector — switches the calendar/title between L-band and
+// the legacy UAV imagery products (RGB / Thermal / LiDAR / NDVI).
+// Only L-band is fully wired so far; other payloads show a "no data yet"
+// calendar that can be expanded later by hooking into uavCatalog.
+// =============================================================
+let uavPayload = "lband";   // lband | rgb | tir | lidar | ndvi | ndwi
+const PAYLOAD_TITLE = {
+  lband: "L-band Radiometer (TB; Soil Moisture)",
+  rgb:   "RGB",
+  tir:   "Thermal",
+  lidar: "LiDAR",
+  ndvi:  "NDVI",
+  ndwi:  "NDWI",
+};
+
+// Sensor metadata for the info card under the Products pills. RGB / Thermal /
+// NDVI / NDWI all come from the same multispectral camera (Altum-PT).
+const PAYLOAD_SENSOR = {
+  lband: {
+    img:  "photos/sensors/UAV_polra_L_band.png",
+    name: "TerraRad PolRA — L-band radiometer",
+    desc: "Passive L-band microwave radiometer (V & H polarization) from " +
+          "TerraRad. Mounted on the UAV to retrieve soil-moisture brightness " +
+          "temperatures (TBv, TBh) over the 1-km cal/val cell.",
+  },
+  lidar: {
+    img:  "photos/sensors/UAV_LiDAR.png",
+    name: "DJI Zenmuse L3 — LiDAR",
+    desc: "DJI Zenmuse L3 LiDAR mounted on the UAV. Generates 1-m-resolution " +
+          "point clouds and digital surface models (DSM) for canopy and " +
+          "topography characterization.",
+  },
+  rgb: {
+    img:  "photos/sensors/UAV_Multispectral.png",
+    name: "MicaSense Altum-PT — Multispectral + Thermal",
+    desc: "MicaSense Altum-PT 6-band multispectral and thermal camera (blue, " +
+          "green, red, red-edge, NIR, LWIR). The RGB composite is built from " +
+          "the blue / green / red bands at 1-m resolution.",
+  },
+  tir: {
+    img:  "photos/sensors/UAV_Multispectral.png",
+    name: "MicaSense Altum-PT — Multispectral + Thermal",
+    desc: "MicaSense Altum-PT thermal channel (LWIR). Surface temperature in " +
+          "°C is retrieved from the calibrated digital numbers; mounted on the " +
+          "UAV alongside the multispectral bands.",
+  },
+  ndvi: {
+    img:  "photos/sensors/UAV_Multispectral.png",
+    name: "MicaSense Altum-PT — Multispectral + Thermal",
+    desc: "NDVI is computed from the red and NIR bands of the MicaSense " +
+          "Altum-PT multispectral camera, at 1-m resolution.",
+  },
+  ndwi: {
+    img:  "photos/sensors/UAV_Multispectral.png",
+    name: "MicaSense Altum-PT — Multispectral + Thermal",
+    desc: "NDWI is computed from the green and NIR bands of the MicaSense " +
+          "Altum-PT multispectral camera, at 1-m resolution.",
+  },
+};
+
+function updateSensorCard(payload) {
+  const meta = PAYLOAD_SENSOR[payload];
+  if (!meta) return;
+  const img  = document.getElementById("uavSensorImg");
+  const name = document.getElementById("uavSensorName");
+  const desc = document.getElementById("uavSensorDesc");
+  if (img)  { img.src = meta.img; img.alt = meta.name; }
+  if (name) name.textContent = meta.name;
+  if (desc) desc.textContent = meta.desc;
+}
+
+function setUavPayload(payload) {
+  // Selections persist across product switches — RGB-04-30 + NDVI-04-30
+  // can be on the map simultaneously. Just update the active product.
+  uavPayload = payload;
+  document.getElementById("uavPayloadTitle").textContent = PAYLOAD_TITLE[payload] || payload;
+  updateSensorCard(payload);
+
+  // The calendar month is intentionally NOT changed when the user switches
+  // product pills — they keep whatever month they were navigating. The
+  // initial month-jump (to the most recent UAV flight overall) happens
+  // once, in initUavCalendarMonth() on first catalog load.
+
+  // L-band has two UI modes:
+  //   • catalog.json mode → calibration + selector + variable radios
+  //     (multi-patch / multi-resolution lband)
+  //   • PolRA-fallback (catalog.csv only) → simpler product radios
+  //     (sm_retr / sm_lgb / tb_v / tb_h)
+  const isLband = payload === "lband";
+  const lbandHasJson = isLband && Object.keys(lbandFlightsByDate || {}).length > 0;
+  // PolRA selector should be visible whenever the L-band pill is active and
+  // we're NOT in catalog.json mode — even if no PolRA flights are catalogued
+  // yet, the user can still see the available products.
+  const polraMode   = isLband && !lbandHasJson;
+
+  document.getElementById("lbandCalibCard").style.display    =
+    lbandHasJson && lbandSelectedDates.size ? "" : "none";
+  document.getElementById("lbandSelectorCard").style.display =
+    lbandHasJson && lbandSelectedDates.size ? "" : "none";
+  document.getElementById("polraSelectorCard").style.display = polraMode ? "" : "none";
+
+  if (!isLband) {
+    document.getElementById("lbandFlightInfo").innerHTML =
+      `<span style="color:var(--muted);">Pick a date with a flight to view it on the In-situ map.</span>`;
+  } else if (lbandHasJson) {
+    if (lbandSelectedDates.size === 0) {
+      document.getElementById("lbandFlightInfo").innerHTML =
+        `<span style="color:var(--muted);">Pick one or more dates with flights.</span>`;
+    }
+  } else {
+    document.getElementById("lbandFlightInfo").innerHTML =
+      `<span style="color:var(--muted);">Pick a date with a flight to view it on the In-situ map.</span>`;
+  }
+  renderLbandCalendar();   // calendar contents depend on payload
+}
+
+// PolRA product radio decides which sub-product (sm_retr / sm_lgb / tb_v /
+// tb_h) the L-band pill renders. Changing it must (1) update every existing
+// lband selection's layer in place, (2) mirror into the In-situ dropdown
+// for consistency, and (3) refresh the single In-situ uavLayer.
+document.querySelectorAll('input[name="polraProduct"]').forEach(r => {
+  r.addEventListener("change", () => {
+    const v   = document.querySelector('input[name="polraProduct"]:checked').value;
+    const sel = document.getElementById("uavProduct");
+    if (sel && [...sel.options].some(o => o.value === v)) sel.value = v;
+
+    // Swap layer for every currently-selected L-band date.
+    [...uavSelections.keys()].filter(k => k.startsWith("lband_")).forEach(selKey => {
+      const date = selKey.slice("lband_".length);
+      const row  = uavCatalog.find(r => r.date === date && r.product === v);
+      const oldLayer = uavLayers.get(selKey);
+      if (oldLayer) { map.removeLayer(oldLayer); uavLayers.delete(selKey); }
+      if (!row) {
+        console.warn(`[uav] no catalog row for lband swap ${date} → ${v}`);
+        uavSelections.delete(selKey);
+        return;
+      }
+      const bounds = [[+row.s, +row.w], [+row.n, +row.e]];
+      const op = +(document.getElementById("uavOpacity")?.value || 80) / 100;
+      const newLayer = L.imageOverlay(`data/uav/${row.file}`, bounds, {
+        opacity: op, interactive: false, pane: "uavPane",
+      }).addTo(map);
+      uavSelections.set(selKey, row);
+      uavLayers.set(selKey, newLayer);
+    });
+    // Also redraw the In-situ tab's single uavLayer with the new product.
+    applyOverlay();
+  });
+});
+
+// Payload pills (horizontal segmented control)
+document.querySelectorAll(".uav-pill").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".uav-pill").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    setUavPayload(btn.dataset.payload);
+  });
+});
+</script>
+</body>
+</html>

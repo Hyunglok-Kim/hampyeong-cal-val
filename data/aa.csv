@@ -1,0 +1,51 @@
+station_id,lat,lon,elevation_m,land_cover,install_date,sensor_model,depths_cm,notes
+HP_1-1,35.016336,126.54562,27.4,Upland crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 1
+HP_1-2,35.011815,126.54647,48.3,Bare soil,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 2
+HP_1-3,35.011339,126.549973,16.3,Upland crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 3
+HP_1-4,35.012657,126.551949,40.3,Mixed crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 4
+HP_1-5,35.01643,126.551323,24.9,Bare soil,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 5
+HP_1-6,35.013069,126.554881,49.1,Upland crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 6
+HP_1-7,35.016867,126.549078,22.0,Orchard,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 7
+HP_1-8,35.013597,126.546363,19.4,Orchard,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 8
+HP_1-9,35.013664,126.548247,17.0,Grassland,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 9
+HP_1-10,35.015402,126.556019,32.0,Bare soil,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 10
+HP_1-11,35.013204,126.552241,54.8,Forest,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 11
+HP_1-12,35.015774,126.553074,17.1,Upland crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 12
+HP_1-13,35.017544,126.556152,53.5,Orchard,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 13
+HP_1-14,35.011466,126.548395,43.6,Forest,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 14
+HP_1-15,35.012024,126.549242,45.2,Mixed crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 15
+HP_1-16,35.019024,126.552454,42.4,Upland crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 16
+HP_1-17,35.015383,126.548031,35.8,Forest,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 17
+HP_1-18,35.019502,126.552365,40.1,Mixed crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 18
+HP_1-19,35.013486,126.553773,17.5,Orchard,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 19
+HP_1-20,35.010843,126.548806,27.0,Upland crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 20
+HP_1-21,35.018811,126.551567,47.3,Upland crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 21
+HP_1-22,35.01648,126.549685,56.2,Grassland,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 22
+HP_1-23,35.011845,126.546877,48.5,Bare soil,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 23
+HP_1-24,35.012929,126.551758,55.4,Grassland,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 24
+HP_1-25,35.013827,126.556285,21.2,Grassland,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 25
+HP_1-26,35.011375,126.545862,19.9,Mixed crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 26
+HP_1-27,35.012,126.552809,41.8,Grassland,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 27
+HP_1-28,35.014004,126.556272,38.8,Bare soil,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 28
+HP_1-29,35.018338,126.545472,47.4,Mixed crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 29
+HP_1-30,35.018555,126.553582,49.6,Forest,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 30
+HP_1-31,35.011562,126.550114,35.4,Mixed crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 31
+HP_1-32,35.018474,126.548235,37.5,Upland crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 32
+HP_1-33,35.015144,126.546513,43.1,Orchard,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 33
+HP_1-34,35.016331,126.552025,21.9,Orchard,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 34
+HP_1-35,35.012014,126.555804,56.5,Rice paddy,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 35
+HP_1-36,35.01597,126.550705,20.0,Forest,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 36
+HP_1-37,35.0185,126.554468,28.8,Rice paddy,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 37
+HP_1-38,35.012731,126.551569,18.5,Mixed crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 38
+HP_1-39,35.014948,126.546105,49.2,Orchard,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 39
+HP_1-40,35.01169,126.552582,57.6,Upland crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 40
+HP_1-41,35.01295,126.554915,34.0,Upland crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 41
+HP_1-42,35.018954,126.55363,46.0,Mixed crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 42
+HP_1-43,35.013372,126.556261,44.2,Grassland,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 43
+HP_1-44,35.018689,126.550298,26.2,Rice paddy,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 44
+HP_1-45,35.01361,126.551798,25.4,Upland crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 45
+HP_1-46,35.010618,126.55311,17.6,Rice paddy,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 46
+HP_1-47,35.018741,126.554774,18.2,Upland crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 47
+HP_1-48,35.013071,126.55067,39.3,Mixed crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 48
+HP_1-49,35.019013,126.551609,36.3,Orchard,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 49
+HP_1-50,35.01483,126.54981,19.2,Mixed crop,2024-12-15,METER TEROS-12,"5,10,20",Hampyeong cal/val station 50
