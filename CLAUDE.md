@@ -159,6 +159,36 @@ python3 build_pictures.py --force     # recompress everything (e.g. after changi
   gallery + side-panel folder list; nothing on disk needs to change when
   the user clicks around the UI.
 
+### 8. Per-station photos (in-situ side panel)
+
+Three sibling folders under `photos/`:
+
+```
+photos/
+├── installation/   HP_<X>_<Y>_Installation_<N>.png   (N = 1..6)
+│                   students installing the sensor at the in-situ point
+├── sensors/        HP_<X>_<Y>_SM_10cm.png
+│                   HP_<X>_<Y>_SM_10cm_Depth.png
+│                   HP_<X>_<Y>_SM_20cm.png
+│                   HP_<X>_<Y>_SM_20cm_Depth.png
+│                   HP_<X>_<Y>_Tree.png
+│                   HP_<X>_<Y>_Logger.png
+│                   close-ups of the actual installed sensor at the site
+└── uav_payloads/   UAV_polra_L_band.png, UAV_LiDAR.png, UAV_Multispectral.png
+                    photos of the UAV sensor payloads (referenced by
+                    PAYLOAD_SENSOR in index.html)
+```
+
+Filename convention uses underscores even though `station_id` uses dashes
+(e.g. station_id `HP_1-2` → photo prefix `HP_1_2_…`).
+
+When a station is selected, `selectStation()` probes a fixed candidate list
+(installation_1 → SM_10cm → SM_20cm → Tree → installation_2/3 → depth →
+logger) and renders the **first 4 photos that load**, in candidate order.
+Missing files are skipped silently. To change the priority or the cap,
+edit the `candidates` array and `MAX_PHOTOS` in `index.html`'s
+`selectStation`.
+
 ## NC overlay schema (the contract `nc_to_overlay.py` enforces)
 
 ```

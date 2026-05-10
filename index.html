@@ -12,7 +12,7 @@
 
 <style>
   :root {
-    --bg: #efeae0;             /* page background — match hydroai.net cream/beige */
+    --bg: #f6f7f9;             /* page background, very subtle cool gray */
     --surface: #ffffff;        /* white card / map container */
     --panel: #0f172a;          /* deep slate panel (was teal) */
     --panel-2: #1e293b;        /* slightly lighter slate (header band, etc.) */
@@ -1078,9 +1078,9 @@
       </div>
 
       <div class="photos">
-        <h4>Station's installation</h4>
+        <h4>Station photos</h4>
         <div class="photo-grid" id="photoGrid">
-          <figure><span>installation</span></figure>
+          <figure><span>—</span></figure>
         </div>
       </div>
 
@@ -1114,7 +1114,7 @@
            and spec text for whichever product pill is active. -->
       <div class="card uav-sensor-card" id="uavSensorCard">
         <div class="uav-sensor-row">
-          <img id="uavSensorImg" class="uav-sensor-img" src="photos/sensors/UAV_polra_L_band.png" alt="">
+          <img id="uavSensorImg" class="uav-sensor-img" src="photos/uav_payloads/UAV_polra_L_band.png" alt="">
           <div class="uav-sensor-text">
             <div class="uav-sensor-name" id="uavSensorName">TerraRad L-band radiometer</div>
             <div class="uav-sensor-desc" id="uavSensorDesc">PolRA — passive L-band microwave radiometer measuring V- and H-pol brightness temperature for soil-moisture retrievals at the cal/val site.</div>
@@ -1815,40 +1815,66 @@ function selectStation(s) {
     ${s.notes || "-"}
   `;
 
-  // photos
+  // photos — single grid showing up to 4 photos per station, drawn from an
+  // ordered candidate list (one student-installation shot, then sensor
+  // close-ups, then extras). Missing photos are skipped silently; we keep
+  // priority order, so the slots fill predictably regardless of load timing.
+  // station_id uses dashes (HP_1-2) but filenames use underscores (HP_1_2).
   const grid = document.getElementById("photoGrid");
-  // Installation photos. Each station can have up to three variants on
-  // disk (some sites are forest, so they also have a tree photo):
-  //   {sid}_SM_10cm.png  — 10 cm sensor close-up
-  //   {sid}_SM_20cm.png  — 20 cm sensor close-up
-  //   {sid}_Tree.png     — surrounding canopy / tree (forest sites)
-  // station_id uses dashes (HP_1-2) but filenames use underscores (HP_1_2),
-  // so we normalize before lookup. Each tile self-hides if missing.
   grid.innerHTML = "";
   const sidU = s.station_id.replace(/-/g, "_");
-  const tiles = [
-    { caption: "10 cm sensor", file: `${PHOTO_DIR}/installation/${sidU}_SM_10cm.png` },
-    { caption: "20 cm sensor", file: `${PHOTO_DIR}/installation/${sidU}_SM_20cm.png` },
-    { caption: "Tree / canopy", file: `${PHOTO_DIR}/installation/${sidU}_Tree.png` },
+  const MAX_PHOTOS = 4;
+  const candidates = [
+    `${PHOTO_DIR}/installation/${sidU}_Installation_1.png`,
+    `${PHOTO_DIR}/sensors/${sidU}_SM_10cm.png`,
+    `${PHOTO_DIR}/sensors/${sidU}_SM_20cm.png`,
+    `${PHOTO_DIR}/sensors/${sidU}_Tree.png`,
+    `${PHOTO_DIR}/installation/${sidU}_Installation_2.png`,
+    `${PHOTO_DIR}/installation/${sidU}_Installation_3.png`,
+    `${PHOTO_DIR}/sensors/${sidU}_SM_10cm_Depth.png`,
+    `${PHOTO_DIR}/sensors/${sidU}_SM_20cm_Depth.png`,
+    `${PHOTO_DIR}/sensors/${sidU}_Logger.png`,
   ];
 
-  tiles.forEach(({ caption, file }) => {
-    const fig = document.createElement("figure");
-    fig.style.display = "none";                  // shown only if the image loads
-    fig.innerHTML = `<span>${caption}</span>`;
-    grid.appendChild(fig);
+  // Probe all candidates in parallel; once each has resolved, render the
+  // first MAX_PHOTOS that loaded (in candidate order). Abort the render if
+  // the user clicks a different station before this one finishes (handled
+  // via stationToken — captured into the closure).
+  const stationToken = s.station_id;
+  const results = new Array(candidates.length).fill(false);
+  const imgs    = new Array(candidates.length).fill(null);
+  let pending = candidates.length;
+
+  candidates.forEach((file, idx) => {
     const img = new Image();
     img.onload = () => {
-      fig.style.display = "";
-      fig.innerHTML = "";
-      fig.appendChild(img);
-      const cap = document.createElement("figcaption");
-      cap.textContent = caption;
-      fig.appendChild(cap);
+      results[idx] = true;
+      imgs[idx] = img;
+      if (--pending === 0) renderGrid();
     };
-    img.onerror = () => { /* leave hidden */ };
+    img.onerror = () => {
+      if (--pending === 0) renderGrid();
+    };
     img.src = file;
   });
+
+  function renderGrid() {
+    if (currentStation && currentStation.station_id !== stationToken) return;
+    grid.innerHTML = "";
+    let shown = 0;
+    for (let i = 0; i < candidates.length && shown < MAX_PHOTOS; i++) {
+      if (!results[i]) continue;
+      const fig = document.createElement("figure");
+      fig.appendChild(imgs[i]);
+      grid.appendChild(fig);
+      shown++;
+    }
+    if (shown === 0) {
+      const empty = document.createElement("figure");
+      empty.innerHTML = "<span>no photos</span>";
+      grid.appendChild(empty);
+    }
+  }
 
   // load timeseries — file uses underscores (HP_10_1.csv) while station_id uses
   // dashes (HP_10-1), so normalize before lookup.
@@ -2878,26 +2904,6 @@ document.getElementById("creditDonateLink")?.addEventListener("click", e => {
   document.querySelector('.tab[data-tab="support"]')?.click();
 });
 
-// Embed mode (?embed=1) — when iframed into a parent page (Webflow), the
-// site's own logo footer should NOT be fixed to the viewport bottom (that
-// caused clipping). Instead, unpin it so it flows at the natural bottom of
-// the page — visible without overlapping the iframe's other content.
-(() => {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get("embed") === "1") {
-    document.documentElement.classList.add("embed-mode");
-    document.body.style.paddingBottom = "0";
-    const f = document.querySelector(".logos-footer");
-    if (f) {
-      f.style.position    = "static";
-      f.style.background  = "transparent";
-      f.style.boxShadow   = "none";
-      f.style.opacity     = "1";
-      f.style.marginTop   = "20px";
-    }
-  }
-})();
-
 // "Clear" button in the UAVs flight list — removes every UAV overlay this
 // tab has put on the map (both the multi-layer selections and the legacy
 // L-band catalog.json selection if any) and resets selection state.
@@ -3465,41 +3471,41 @@ const PAYLOAD_TITLE = {
 // NDVI / NDWI all come from the same multispectral camera (Altum-PT).
 const PAYLOAD_SENSOR = {
   lband: {
-    img:  "photos/sensors/UAV_polra_L_band.png",
+    img:  "photos/uav_payloads/UAV_polra_L_band.png",
     name: "TerraRad PolRA — L-band radiometer",
     desc: "Passive L-band microwave radiometer (V & H polarization) from " +
           "TerraRad. Mounted on the UAV to retrieve soil-moisture brightness " +
           "temperatures (TBv, TBh) over the 1-km cal/val cell.",
   },
   lidar: {
-    img:  "photos/sensors/UAV_LiDAR.png",
+    img:  "photos/uav_payloads/UAV_LiDAR.png",
     name: "DJI Zenmuse L3 — LiDAR",
     desc: "DJI Zenmuse L3 LiDAR mounted on the UAV. Generates 1-m-resolution " +
           "point clouds and digital surface models (DSM) for canopy and " +
           "topography characterization.",
   },
   rgb: {
-    img:  "photos/sensors/UAV_Multispectral.png",
+    img:  "photos/uav_payloads/UAV_Multispectral.png",
     name: "MicaSense Altum-PT — Multispectral + Thermal",
     desc: "MicaSense Altum-PT 6-band multispectral and thermal camera (blue, " +
           "green, red, red-edge, NIR, LWIR). The RGB composite is built from " +
           "the blue / green / red bands at 1-m resolution.",
   },
   tir: {
-    img:  "photos/sensors/UAV_Multispectral.png",
+    img:  "photos/uav_payloads/UAV_Multispectral.png",
     name: "MicaSense Altum-PT — Multispectral + Thermal",
     desc: "MicaSense Altum-PT thermal channel (LWIR). Surface temperature in " +
           "°C is retrieved from the calibrated digital numbers; mounted on the " +
           "UAV alongside the multispectral bands.",
   },
   ndvi: {
-    img:  "photos/sensors/UAV_Multispectral.png",
+    img:  "photos/uav_payloads/UAV_Multispectral.png",
     name: "MicaSense Altum-PT — Multispectral + Thermal",
     desc: "NDVI is computed from the red and NIR bands of the MicaSense " +
           "Altum-PT multispectral camera, at 1-m resolution.",
   },
   ndwi: {
-    img:  "photos/sensors/UAV_Multispectral.png",
+    img:  "photos/uav_payloads/UAV_Multispectral.png",
     name: "MicaSense Altum-PT — Multispectral + Thermal",
     desc: "NDWI is computed from the green and NIR bands of the MicaSense " +
           "Altum-PT multispectral camera, at 1-m resolution.",
