@@ -1,19 +1,48 @@
 # Hampyeong Cal/Val Data Portal
 
 Interactive web portal for the Hampyeong (함평) 1-km cal/val site, run by
-HydroAI lab. Designed to be embedded in **hydroai.net** (Webflow) via iframe.
+HydroAI lab. Embedded in **hydroai.net** (Webflow) via iframe.
 Stack is pure static: Leaflet + Plotly + PapaParse, no backend.
+
+## ⚠️ Where to edit (read this before changing anything)
+
+The portal exists in **two parallel locations on disk**, and only one of
+them deploys:
+
+| Path | Role |
+|---|---|
+| **`/Users/hyunglokkim/Code/hampyeong_data_portal/`** | git checkout of `github.com/Hyunglok-Kim/hampyeong-cal-val.git`. **Pushes to `main` auto-deploy** (GitHub Pages → Webflow iframe). **Edit here.** |
+| `~/Insync/hkim@geol.sc.edu/Google Drive/website/hampyeong_data_portal/` | Google Drive mirror via Insync. Backup only — Insync **does not** push to git, so changes here never reach the live site. |
+
+If you're prompted into a Claude/terminal session whose CWD is the Insync
+folder, `cd /Users/hyunglokkim/Code/hampyeong_data_portal` first. Sync any
+in-flight Insync edits over to Code/, then commit + push from Code/.
 
 ## Quick start
 
 ```bash
-# in hampyeong_data_portal/
+cd /Users/hyunglokkim/Code/hampyeong_data_portal
 python3 -m http.server 8765
 # open http://localhost:8765/index.html
 ```
 
 That's it — every script writes into the static `data/` tree the page already
 reads.
+
+## Deploy
+
+GitHub Pages is enabled on `main`. Push and the live site updates within
+~1 min; Webflow then pulls via iframe.
+
+```bash
+cd /Users/hyunglokkim/Code/hampyeong_data_portal
+git add -A
+git commit -m "..."
+git push origin main
+```
+
+`.nojekyll` at the repo root keeps Pages from filtering out folders that
+start with underscore (e.g. `data/pictures/<visit>/_web/` thumbnails).
 
 ## Site geometry (single source of truth: KMLs)
 
@@ -274,12 +303,14 @@ re-order, edit the `<footer class="logos">` block in `index.html`.
 
 ## Webflow embed
 
-Once finalized, host this folder on GitHub Pages / Netlify / Webflow assets,
-then in Webflow:
+Hosted on GitHub Pages from `main` (see "Deploy" up top). Embedded in
+hydroai.net via:
 ```html
-<iframe src="https://your-host/hampyeong_data_portal/index.html"
+<iframe src="https://hyunglok-kim.github.io/hampyeong-cal-val/index.html?embed=1"
         width="100%" height="900" style="border:0;"></iframe>
 ```
+The `?embed=1` flag unfixes the logo footer so it sits in normal flow inside
+the iframe (see `c05fc88` for context).
 
 ## Known gotchas
 
