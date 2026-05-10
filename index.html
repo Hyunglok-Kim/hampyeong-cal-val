@@ -702,6 +702,19 @@
   .uav-pill.active .uav-pill-sub { color: rgba(255,255,255,0.85); }
   /* Give the L-band pill (with subtitle) a bit more breathing room */
   .uav-pill[data-payload="lband"] { flex: 2 1 auto; min-width: 130px; }
+  /* Same treatment for the multi-line satellite pills */
+  #satProductPills .uav-pill { flex: 1 1 auto; min-width: 110px; }
+  #satProductPills .uav-pill[data-source="nisar"] { flex: 2 1 auto; min-width: 130px; }
+  /* Text-badge fallback for satellite "sensor" image (no payload photo) */
+  .sat-sensor-badge {
+    display: flex; align-items: center; justify-content: center;
+    width: 110px; height: 110px;
+    border-radius: 6px;
+    color: #fff; font-weight: 700; font-size: 20px;
+    letter-spacing: 0.04em;
+    flex: 0 0 auto;
+    text-align: center;
+  }
   /* Sensor info card under the Products pills */
   .uav-sensor-card { padding: 12px 14px; }
   .uav-sensor-row {
@@ -1224,9 +1237,116 @@
       </div>
     </div>
 
-    <!-- Other tabs: stub side panels -->
+    <!-- Satellites tab — mirrors UAVs tab layout (pills + sensor info +
+         calendar + scene list + selected scene + downloads). NISAR has its
+         own sub-product card analogous to UAV's PolRA selector. -->
     <div class="side" id="side-sat" style="display:none;">
-      <div class="card"><h4>Satellites</h4><div>Per-source views coming soon. Use the map's Satellite layer toggle for now.</div></div>
+      <div class="station-id">Satellites</div>
+
+      <!-- Card 1: Products selector -->
+      <div class="card">
+        <h4 style="margin-top:0;">Products</h4>
+        <div class="uav-pills" id="satProductPills">
+          <button class="uav-pill active" data-source="hls" data-product="ndvi" type="button">
+            <span class="uav-pill-name">HLS NDVI</span>
+            <span class="uav-pill-sub">30 m · 2-3 day</span>
+          </button>
+          <button class="uav-pill" data-source="landsat" data-product="lst" type="button">
+            <span class="uav-pill-name">Landsat LST</span>
+            <span class="uav-pill-sub">30 m · 8-day</span>
+          </button>
+          <button class="uav-pill" data-source="modis" data-product="ndvi" type="button">
+            <span class="uav-pill-name">MODIS NDVI</span>
+            <span class="uav-pill-sub">500 m · 16-day</span>
+          </button>
+          <button class="uav-pill" data-source="modis" data-product="lst" type="button">
+            <span class="uav-pill-name">MODIS LST</span>
+            <span class="uav-pill-sub">1 km · 8-day</span>
+          </button>
+          <button class="uav-pill" data-source="nisar" data-product="sm" type="button">
+            <span class="uav-pill-name">NISAR SAR</span>
+            <span class="uav-pill-sub">200 m · 5 vars</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sensor info card — refreshed by setSatProduct() to show a colored
+           text badge (HLS/L8/MODIS/NISAR) plus name + description. -->
+      <div class="card uav-sensor-card" id="satSensorCard">
+        <div class="uav-sensor-row">
+          <div id="satSensorImg" class="sat-sensor-badge" style="background:#16a34a;">HLS</div>
+          <div class="uav-sensor-text">
+            <div class="uav-sensor-name" id="satSensorName">NASA HLS — Harmonized Landsat-Sentinel</div>
+            <div class="uav-sensor-desc" id="satSensorDesc">30-m NDVI built from co-registered Landsat 8/9 (L30) and Sentinel-2 (S30) surface reflectance with Fmask cloud / shadow / water masking. 2-3 day combined revisit.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card: Scene calendar (left) + chronological scene list (right) -->
+      <div class="card">
+        <h4 id="satProductTitle" style="margin-top:0;">HLS NDVI (30 m, 2-3 day)</h4>
+        <div class="uav-cal-row">
+          <div class="uav-cal-col">
+            <div class="lband-cal-controls">
+              <button class="btn btn-secondary lband-cal-nav" id="satCalPrev"  type="button">‹</button>
+              <span id="satCalLabel" class="lband-cal-label" title="Click to change month/year">—</span>
+              <div id="satCalPicker" class="lband-cal-picker">
+                <select id="satCalMonthSel"></select>
+                <select id="satCalYearSel"></select>
+              </div>
+              <button class="btn btn-secondary lband-cal-nav" id="satCalNext"  type="button">›</button>
+              <button class="btn btn-secondary lband-cal-nav" id="satCalToday" type="button">Today</button>
+            </div>
+            <div id="satCalendar" class="lband-cal"></div>
+            <div id="satCalHint" style="font-size:11px;color:var(--muted);margin-top:6px;">
+              Red-filled days have a scene. Click to add/remove from the map.
+            </div>
+          </div>
+          <div class="uav-flight-list-col">
+            <div class="uav-flight-list-header">
+              <span>All scenes</span>
+              <span id="satSceneSelectedCount" class="uav-flight-count">0 selected</span>
+              <button type="button" id="satClearSelections" class="uav-flight-clear" title="Remove all selected scenes from the map">Clear</button>
+            </div>
+            <div id="satSceneList" class="uav-flight-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Selected scene info -->
+      <div class="card" id="satSceneCard">
+        <h4>Selected scene</h4>
+        <div id="satSceneInfo" style="font-size:13px;color:var(--muted);">Pick a date with a scene.</div>
+      </div>
+
+      <!-- NISAR sub-product card (analogous to UAV PolRA card) — only shown
+           when the active source is "nisar" -->
+      <div class="card" id="nisarSelectorCard" style="display:none;">
+        <h4>NISAR variable</h4>
+        <div class="lband-row">
+          <label><input type="radio" name="nisarSubProduct" value="sm" checked> SM Beta (m³/m³)</label>
+          <label><input type="radio" name="nisarSubProduct" value="gist_sm"> GIST SM (m³/m³)</label>
+          <label><input type="radio" name="nisarSubProduct" value="hh"> HH backscatter (linear)</label>
+          <label><input type="radio" name="nisarSubProduct" value="hv"> HV backscatter (linear)</label>
+          <label><input type="radio" name="nisarSubProduct" value="lia"> Local Incidence Angle (°)</label>
+        </div>
+      </div>
+
+      <!-- Downloads -->
+      <div class="card" id="satDownloadCard">
+        <h4>Downloads</h4>
+        <button class="btn" id="satDownloadSelected" style="width:100%;margin-bottom:6px;">
+          Download selected overlays (PNG)
+        </button>
+        <button class="btn btn-secondary" id="satRequestRaw" style="width:100%;">
+          Request raw NC files (email)
+        </button>
+        <div id="satDownloadHint" style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.45;">
+          PNG download saves the same georeferenced overlays you see on the
+          map (one file per active selection). Raw NC requests are sent by
+          email so we can package the right resolution and metadata.
+        </div>
+      </div>
     </div>
     <div class="side" id="side-model" style="display:none;">
       <div class="card"><h4>Models</h4><div>Model output viewer coming soon.</div></div>
@@ -1524,6 +1644,17 @@ let uavLayer = null;        // current Leaflet imageOverlay
 let satCatalog = [];
 let satLayer = null;
 let nisarLayer = null;       // separate from satLayer so NISAR can overlay alongside
+
+// Satellites tab — multi-overlay selection state, mirrors uav* equivalents.
+// Selection key: "{source}_{product}_{date}_{time}" (time disambiguates HLS
+// dates with two scenes at different acquisition times).
+let satProductSource    = "hls";
+let satProductName      = "ndvi";
+let satCalDate          = new Date();
+let satLastClickedKey   = null;
+let _satCalInitDone     = false;
+const satSelections     = new Map();   // selKey → catalog row
+const satLayers         = new Map();   // selKey → Leaflet imageOverlay
 
 // basemap state (LULC, soil properties, etc.)
 let basemapCatalog = [];    // [{id, label, file, n,s,e,w, type, classes|colormap, ...}]
@@ -2776,6 +2907,9 @@ document.querySelectorAll(".tab").forEach(btn => {
     if (t === "uav") {
       ensureLbandLoaded();                             // lazy-load catalog on first visit
     }
+    if (t === "sat") {
+      ensureSatLoaded();                               // first-visit calendar jump
+    }
     if (t === "pic") {
       ensurePicturesLoaded();                          // lazy-load pictures catalog
     }
@@ -3449,6 +3583,469 @@ document.querySelectorAll('input[name="lbandVar"]').forEach(r =>
 document.getElementById("lbandOpacity").addEventListener("input", e => {
   document.getElementById("lbandOpacityVal").textContent = `${e.target.value}%`;
   drawLbandOverlays();
+});
+
+// =============================================================
+// Satellites tab — mirrors UAV pattern. Multi-overlay flow: each (source,
+// product, date, time) selection adds its own overlay to the In-situ map
+// and stays until the user toggles it off. Switching pills does NOT clear
+// selections; HLS-2025-04-30 + Landsat-2025-04-30 can coexist on the map.
+// Layers go onto the existing `satellitePane` so they render under uavPane
+// and above basemapPane (consistent with the In-situ tab's `layerSat`).
+// =============================================================
+const SAT_TITLE = {
+  "hls:ndvi":      "HLS NDVI (30 m, 2-3 day)",
+  "landsat:lst":   "Landsat LST (30 m, 8-day, °C)",
+  "modis:ndvi":    "MODIS NDVI (500 m, 16-day)",
+  "modis:lst":     "MODIS LST (1 km, 8-day, °C)",
+  "nisar:sm":      "NISAR SM Beta (200 m, m³/m³)",
+  "nisar:gist_sm": "NISAR GIST SM (200 m, m³/m³)",
+  "nisar:hh":      "NISAR HH backscatter (200 m, linear)",
+  "nisar:hv":      "NISAR HV backscatter (200 m, linear)",
+  "nisar:lia":     "NISAR Local Incidence Angle (200 m, °)",
+};
+
+const SAT_SENSOR = {
+  "hls:ndvi": {
+    badge: "HLS",   bg: "#16a34a",
+    name: "NASA HLS — Harmonized Landsat-Sentinel",
+    desc: "30-m NDVI built from co-registered Landsat 8/9 (L30) and Sentinel-2 (S30) surface reflectance with Fmask cloud / shadow / water masking. 2-3 day combined revisit.",
+  },
+  "landsat:lst": {
+    badge: "L8/9",  bg: "#0369a1",
+    name: "Landsat 8 / 9 — TIRS thermal sensor",
+    desc: "Collection-2 Level-2 ST_B10 surface temperature (°C) at 30 m, QA-pixel masked. 8-day combined revisit (16-day per platform).",
+  },
+  "modis:ndvi": {
+    badge: "MODIS", bg: "#0ea5e9",
+    name: "MODIS Terra — MOD13A1",
+    desc: "500-m 16-day NDVI composite. Daily Terra acquisitions composited to maximize cloud-free pixels.",
+  },
+  "modis:lst": {
+    badge: "MODIS", bg: "#0ea5e9",
+    name: "MODIS Terra — MOD11A2",
+    desc: "1-km 8-day daytime LST composite (°C). Aggregates clear-sky thermal observations from MODIS bands 31-32 split-window.",
+  },
+  "nisar:sm": {
+    badge: "NISAR", bg: "#7c3aed",
+    name: "NASA-ISRO SAR (NISAR) — SM Beta",
+    desc: "L-band SAR-derived soil-moisture beta product at 200 m. NISAR is the L-band cal/val anchor; this site is one of its validation nodes.",
+  },
+  "nisar:gist_sm": {
+    badge: "NISAR", bg: "#7c3aed",
+    name: "NISAR — GIST SM beta",
+    desc: "L-band SAR soil moisture, GIST-team retrieval (200 m).",
+  },
+  "nisar:hh": {
+    badge: "NISAR", bg: "#7c3aed",
+    name: "NISAR — HH backscatter",
+    desc: "Co-pol L-band backscatter (linear units, 200 m).",
+  },
+  "nisar:hv": {
+    badge: "NISAR", bg: "#7c3aed",
+    name: "NISAR — HV backscatter",
+    desc: "Cross-pol L-band backscatter (linear units, 200 m).",
+  },
+  "nisar:lia": {
+    badge: "NISAR", bg: "#7c3aed",
+    name: "NISAR — Local Incidence Angle",
+    desc: "Geometric incidence angle in degrees at 200 m, derived per pixel.",
+  },
+};
+
+function _satKey(row) {
+  return `${row.source}_${row.product}_${row.date}_${row.time || ""}`;
+}
+
+function scenesForActivePill() {
+  // Returns { "YYYY-MM-DD": [row, row, ...] } for the active (source, product).
+  // Multiple rows per date allowed (HLS frequently has two scenes per day).
+  const out = {};
+  satCatalog.forEach(r => {
+    if (r.source !== satProductSource) return;
+    if (r.product !== satProductName)  return;
+    if (!out[r.date]) out[r.date] = [];
+    out[r.date].push(r);
+  });
+  return out;
+}
+
+function ensureSatLoaded() {
+  // satCatalog is loaded eagerly at page start (see [sat] catalog loaded log).
+  // First visit to the tab → jump the calendar to the month of the most
+  // recent scene of the default (HLS:NDVI) pill.
+  if (_satCalInitDone) { renderSatCalendar(); return; }
+  if (!satCatalog.length) { renderSatCalendar(); return; }
+  const dates = satCatalog
+    .filter(r => r.source === satProductSource && r.product === satProductName)
+    .map(r => r.date).sort();
+  if (dates.length) {
+    const last = new Date(dates[dates.length - 1] + "T00:00:00");
+    satCalDate = new Date(last.getFullYear(), last.getMonth(), 1);
+  }
+  _satCalInitDone = true;
+  renderSatCalendar();
+  setSatProduct(satProductSource, satProductName);   // populate sensor card etc.
+}
+
+function updateSatSensorCard(source, product) {
+  const meta = SAT_SENSOR[`${source}:${product}`];
+  if (!meta) return;
+  const badge = document.getElementById("satSensorImg");
+  const name  = document.getElementById("satSensorName");
+  const desc  = document.getElementById("satSensorDesc");
+  if (badge) {
+    badge.textContent = meta.badge;
+    badge.style.background = meta.bg;
+  }
+  if (name) name.textContent = meta.name;
+  if (desc) desc.textContent = meta.desc;
+}
+
+function setSatProduct(source, product) {
+  satProductSource = source;
+  satProductName   = product;
+  document.getElementById("satProductTitle").textContent =
+    SAT_TITLE[`${source}:${product}`] || `${source} ${product}`;
+  updateSatSensorCard(source, product);
+  document.getElementById("nisarSelectorCard").style.display =
+    (source === "nisar") ? "" : "none";
+  // Re-sync the NISAR sub-product radio to the active product when the user
+  // taps the NISAR pill itself (so the radio reflects the displayed variable).
+  if (source === "nisar") {
+    const r = document.querySelector(`input[name="nisarSubProduct"][value="${product}"]`);
+    if (r) r.checked = true;
+  }
+  renderSatCalendar();
+}
+
+function renderSatSceneList() {
+  const list    = document.getElementById("satSceneList");
+  const counter = document.getElementById("satSceneSelectedCount");
+  if (!list) return;
+
+  const scenesByDate = scenesForActivePill();
+  const dates = Object.keys(scenesByDate).sort().reverse();   // newest first
+
+  list.innerHTML = "";
+  if (!dates.length) {
+    list.innerHTML = `<div class="uav-flight-list-empty">No scenes catalogued for this product yet.</div>`;
+    counter.textContent = "0 selected";
+    return;
+  }
+
+  dates.forEach(d => {
+    scenesByDate[d].forEach(row => {
+      const k = _satKey(row);
+      const sel = satSelections.has(k);
+      const r = document.createElement("div");
+      r.className = "uav-flight-row" + (sel ? " selected" : "");
+      r.innerHTML = `
+        <span class="uav-flight-check"></span>
+        <span class="uav-flight-date">${row.date}</span>
+        <span class="uav-flight-time">${(row.time || "").slice(0,5)} UTC</span>
+      `;
+      r.title = `${row.date} ${row.time || ""} UTC — ${row.source} ${row.product}`;
+      r.addEventListener("click", () => selectSatScene(row));
+      list.appendChild(r);
+    });
+  });
+  counter.textContent = `${satSelections.size} selected`;
+}
+
+function renderSatCalendar() {
+  const cal   = document.getElementById("satCalendar");
+  const label = document.getElementById("satCalLabel");
+  if (!cal) return;
+  const year  = satCalDate.getFullYear();
+  const month = satCalDate.getMonth();
+  if (label) label.textContent = `${MONTH_NAMES[month]} ${year}`;
+
+  cal.innerHTML = "";
+  ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].forEach(d => {
+    const dn = document.createElement("div");
+    dn.className = "lband-dow"; dn.textContent = d;
+    cal.appendChild(dn);
+  });
+
+  const scenesByDate = scenesForActivePill();
+  const hint = document.getElementById("satCalHint");
+  if (hint) {
+    const title = SAT_TITLE[`${satProductSource}:${satProductName}`] || `${satProductSource} ${satProductName}`;
+    hint.textContent = Object.keys(scenesByDate).length
+      ? `Red-filled days have a ${title.split(" (")[0]} scene. Click to add/remove from the map.`
+      : `${title}: no scenes catalogued for this product.`;
+  }
+
+  const first    = new Date(year, month, 1);
+  const start    = new Date(year, month, 1 - first.getDay());
+  const todayStr = new Date().toISOString().slice(0,10);
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    const cell = document.createElement("div");
+    cell.className = "lband-day";
+    cell.textContent = d.getDate();
+    if (d.getMonth() !== month) cell.classList.add("lband-other");
+    if (ds === todayStr)        cell.classList.add("lband-today");
+    if (scenesByDate[ds]) {
+      cell.classList.add("lband-flight");
+      cell.title = `Scene on ${ds}`;
+      // Click cell → toggle the FIRST scene of that date (typical: only one).
+      // Multi-scene days are toggled individually from the scene list.
+      cell.addEventListener("click", () => selectSatScene(scenesByDate[ds][0]));
+      // Highlight cell as selected if ANY of that day's rows is on the map.
+      if (scenesByDate[ds].some(r => satSelections.has(_satKey(r)))) {
+        cell.classList.add("lband-selected");
+      }
+    }
+    cal.appendChild(cell);
+  }
+  renderSatSceneList();
+}
+
+function selectSatScene(row) {
+  const k = _satKey(row);
+  if (satSelections.has(k)) {
+    // Deselect → remove the corresponding leaflet layer.
+    satSelections.delete(k);
+    const layer = satLayers.get(k);
+    if (layer) { map.removeLayer(layer); satLayers.delete(k); }
+    if (satLastClickedKey === k) satLastClickedKey = null;
+  } else {
+    const bounds = [[+row.s, +row.w], [+row.n, +row.e]];
+    const op = +(document.getElementById("satOpacity")?.value || 80) / 100;
+    const layer = L.imageOverlay(`data/satellites/${row.file}`, bounds, {
+      opacity: op, interactive: false, pane: "satellitePane",
+    }).addTo(map);
+    satSelections.set(k, row);
+    satLayers.set(k, layer);
+    satLastClickedKey = k;
+  }
+  renderSatCalendar();    // re-paint highlights + list
+
+  // Sync In-situ tab controls to the most recently clicked selection so the
+  // legend and the In-situ single-layer view stay consistent.
+  if (!satLastClickedKey || !satSelections.has(satLastClickedKey)) {
+    satLastClickedKey = satSelections.size ? [...satSelections.keys()].pop() : null;
+  }
+  const cbSat   = document.getElementById("layerSat");
+  const cbNis   = document.getElementById("layerNisar");
+  const di      = document.getElementById("overlayDate");
+  const satSel  = document.getElementById("satProduct");
+  const nisarSel= document.getElementById("nisarProduct");
+  if (satLastClickedKey) {
+    const r = satSelections.get(satLastClickedKey);
+    if (di) di.value = r.date;
+    if (r.source === "nisar") {
+      if (nisarSel && [...nisarSel.options].some(o => o.value === r.product)) nisarSel.value = r.product;
+      if (cbNis) cbNis.checked = true;
+    } else {
+      const v = `${r.source}:${r.product}`;
+      if (satSel && [...satSel.options].some(o => o.value === v)) satSel.value = v;
+      if (cbSat) cbSat.checked = true;
+    }
+  } else {
+    // No selections left — turn off both checkboxes (only if their layers came
+    // exclusively from the Sat tab; the In-situ user can re-enable manually).
+    if (cbSat) cbSat.checked = false;
+    if (cbNis) cbNis.checked = false;
+  }
+  applyOverlay();
+
+  // Selected-scene info panel
+  const info = document.getElementById("satSceneInfo");
+  if (!info) return;
+  if (satSelections.size === 0) {
+    info.innerHTML = `<span style="color:var(--muted);">Pick a date with a scene.</span>`;
+    return;
+  }
+  const lines = [...satSelections.entries()]
+    .sort(([a], [b]) => a < b ? -1 : 1)
+    .map(([key, r]) => {
+      const star = (key === satLastClickedKey) ? " ★" : "";
+      const t = (r.time || "").slice(0,5);
+      return `<div><b>${r.date}</b> ${t} UTC — ${r.source.toUpperCase()} ${r.product.toUpperCase()} (${r.resolution_m} m)${star}</div>`;
+    }).join("");
+  info.innerHTML =
+    `<div style="font-size:13px;line-height:1.55;">${lines}</div>` +
+    `<div style="font-size:11px;color:var(--muted);margin-top:6px;">` +
+    `${satSelections.size} overlay(s) on map. ★ = most recent. ` +
+    `Click a highlighted day again to remove its overlay.</div>`;
+}
+
+// Calendar control wiring
+document.getElementById("satCalPrev")?.addEventListener("click", () => {
+  satCalDate = new Date(satCalDate.getFullYear(), satCalDate.getMonth() - 1, 1);
+  renderSatCalendar();
+});
+document.getElementById("satCalNext")?.addEventListener("click", () => {
+  satCalDate = new Date(satCalDate.getFullYear(), satCalDate.getMonth() + 1, 1);
+  renderSatCalendar();
+});
+document.getElementById("satCalToday")?.addEventListener("click", () => {
+  const t = new Date();
+  satCalDate = new Date(t.getFullYear(), t.getMonth(), 1);
+  renderSatCalendar();
+});
+
+function openSatCalPicker() {
+  const label  = document.getElementById("satCalLabel");
+  const picker = document.getElementById("satCalPicker");
+  const monSel = document.getElementById("satCalMonthSel");
+  const yrSel  = document.getElementById("satCalYearSel");
+
+  monSel.innerHTML = "";
+  MONTH_NAMES.forEach((name, i) => {
+    const o = document.createElement("option");
+    o.value = i; o.textContent = name;
+    if (i === satCalDate.getMonth()) o.selected = true;
+    monSel.appendChild(o);
+  });
+  let yMin, yMax;
+  const dates = satCatalog.map(r => r.date).filter(Boolean);
+  if (dates.length) {
+    const ys = dates.map(d => +d.slice(0, 4));
+    yMin = Math.min(...ys) - 1;
+    yMax = Math.max(...ys) + 1;
+  } else {
+    const ynow = new Date().getFullYear();
+    yMin = ynow - 2; yMax = ynow + 2;
+  }
+  yrSel.innerHTML = "";
+  for (let y = yMin; y <= yMax; y++) {
+    const o = document.createElement("option");
+    o.value = y; o.textContent = y;
+    if (y === satCalDate.getFullYear()) o.selected = true;
+    yrSel.appendChild(o);
+  }
+  label.style.display  = "none";
+  picker.style.display = "flex";
+  monSel.focus();
+}
+function closeSatCalPicker() {
+  document.getElementById("satCalPicker").style.display = "none";
+  document.getElementById("satCalLabel").style.display  = "";
+}
+function applySatCalPicker() {
+  const m = +document.getElementById("satCalMonthSel").value;
+  const y = +document.getElementById("satCalYearSel").value;
+  satCalDate = new Date(y, m, 1);
+  closeSatCalPicker();
+  renderSatCalendar();
+}
+document.getElementById("satCalLabel")?.addEventListener("click", openSatCalPicker);
+document.getElementById("satCalMonthSel")?.addEventListener("change", applySatCalPicker);
+document.getElementById("satCalYearSel" )?.addEventListener("change", applySatCalPicker);
+document.addEventListener("click", (ev) => {
+  const picker = document.getElementById("satCalPicker");
+  if (!picker || picker.style.display === "none") return;
+  if (picker.contains(ev.target) || ev.target.id === "satCalLabel") return;
+  closeSatCalPicker();
+});
+
+// Pill click → switch active product (selections persist)
+document.querySelectorAll('#satProductPills .uav-pill').forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll('#satProductPills .uav-pill')
+      .forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    setSatProduct(btn.dataset.source, btn.dataset.product);
+  });
+});
+
+// NISAR sub-product radio: swap layers in place for any active NISAR
+// selections, and update the pill's data-product so subsequent calendar
+// clicks pick up the new variable.
+document.querySelectorAll('input[name="nisarSubProduct"]').forEach(r => {
+  r.addEventListener("change", () => {
+    const v = document.querySelector('input[name="nisarSubProduct"]:checked').value;
+    const nisarPill = document.querySelector('#satProductPills .uav-pill[data-source="nisar"]');
+    if (nisarPill) {
+      nisarPill.dataset.product = v;
+      if (nisarPill.classList.contains("active")) {
+        satProductName = v;
+        document.getElementById("satProductTitle").textContent =
+          SAT_TITLE[`nisar:${v}`] || `NISAR ${v}`;
+        updateSatSensorCard("nisar", v);
+      }
+    }
+    // Swap layer for every active NISAR selection in place.
+    [...satSelections.keys()].filter(k => k.startsWith("nisar_")).forEach(oldKey => {
+      const oldRow = satSelections.get(oldKey);
+      const newRow = satCatalog.find(rr =>
+        rr.source === "nisar" && rr.product === v && rr.date === oldRow.date
+      );
+      const oldLayer = satLayers.get(oldKey);
+      if (oldLayer) { map.removeLayer(oldLayer); satLayers.delete(oldKey); }
+      satSelections.delete(oldKey);
+      if (!newRow) return;
+      const newKey = _satKey(newRow);
+      const bounds = [[+newRow.s, +newRow.w], [+newRow.n, +newRow.e]];
+      const op = +(document.getElementById("satOpacity")?.value || 80) / 100;
+      const lyr = L.imageOverlay(`data/satellites/${newRow.file}`, bounds, {
+        opacity: op, interactive: false, pane: "satellitePane",
+      }).addTo(map);
+      satSelections.set(newKey, newRow);
+      satLayers.set(newKey, lyr);
+      if (oldKey === satLastClickedKey) satLastClickedKey = newKey;
+    });
+    // Mirror into the In-situ NISAR dropdown so the legend strip is right.
+    const nisarSel = document.getElementById("nisarProduct");
+    if (nisarSel && [...nisarSel.options].some(o => o.value === v)) nisarSel.value = v;
+    renderSatCalendar();
+    applyOverlay();
+  });
+});
+
+// "Clear" button — removes every Sat-tab overlay, resets state, turns off
+// the In-situ tab's `layerSat` / `layerNisar` checkboxes.
+document.getElementById("satClearSelections")?.addEventListener("click", () => {
+  satLayers.forEach(l => map.removeLayer(l));
+  satLayers.clear();
+  satSelections.clear();
+  satLastClickedKey = null;
+  const cbSat = document.getElementById("layerSat");
+  const cbNis = document.getElementById("layerNisar");
+  if (cbSat) cbSat.checked = false;
+  if (cbNis) cbNis.checked = false;
+  applyOverlay();
+  renderSatCalendar();
+  const info = document.getElementById("satSceneInfo");
+  if (info) info.innerHTML = `<span style="color:var(--muted);">Pick a date with a scene.</span>`;
+});
+
+// Downloads — staggered <a download> per active selection, then mailto.
+document.getElementById("satDownloadSelected")?.addEventListener("click", () => {
+  if (satSelections.size === 0) {
+    alert("No scenes selected. Pick a date with a scene in the calendar first.");
+    return;
+  }
+  let i = 0;
+  satSelections.forEach(row => {
+    setTimeout(() => {
+      const a = document.createElement("a");
+      a.href = `data/satellites/${row.file}`;
+      a.download = row.file;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }, i * 350);
+    i++;
+  });
+});
+
+document.getElementById("satRequestRaw")?.addEventListener("click", () => {
+  const lines = [...satSelections.values()].map(r =>
+    `  - ${r.date} ${r.source.toUpperCase()} ${r.product.toUpperCase()} (${r.resolution_m} m)`
+  ).join("\n");
+  const selBlock = lines.length
+    ? `\nCurrently selected on the map:\n${lines}\n`
+    : "\n(No specific selection — please describe the dates / products you need.)\n";
+  const subject = encodeURIComponent("HydroAI - Hampyeong satellite raw NC request");
+  const body    = encodeURIComponent("Name:\nAffiliation:\nIntended use:\n" + selBlock);
+  window.location.href = `mailto:hyunglokkim@gmail.com?subject=${subject}&body=${body}`;
 });
 
 // =============================================================
