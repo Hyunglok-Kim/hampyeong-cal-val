@@ -2878,16 +2878,23 @@ document.getElementById("creditDonateLink")?.addEventListener("click", e => {
   document.querySelector('.tab[data-tab="support"]')?.click();
 });
 
-// Embed mode (?embed=1) — hide the site's own sticky logo footer so it
-// doesn't double up with the parent page's footer/header inside an iframe.
-// Adds a CSS class on <html> so styles can react if needed.
+// Embed mode (?embed=1) — when iframed into a parent page (Webflow), the
+// site's own logo footer should NOT be fixed to the viewport bottom (that
+// caused clipping). Instead, unpin it so it flows at the natural bottom of
+// the page — visible without overlapping the iframe's other content.
 (() => {
   const params = new URLSearchParams(window.location.search);
   if (params.get("embed") === "1") {
     document.documentElement.classList.add("embed-mode");
-    const f = document.querySelector(".logos-footer");
-    if (f) f.style.display = "none";
     document.body.style.paddingBottom = "0";
+    const f = document.querySelector(".logos-footer");
+    if (f) {
+      f.style.position    = "static";
+      f.style.background  = "transparent";
+      f.style.boxShadow   = "none";
+      f.style.opacity     = "1";
+      f.style.marginTop   = "20px";
+    }
   }
 })();
 
