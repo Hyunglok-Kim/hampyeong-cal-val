@@ -923,6 +923,10 @@
       <button class="tab" data-tab="model">Models</button>
       <button class="tab" data-tab="ai">AI prediction</button>
       <button class="tab" data-tab="pic">Visitor History</button>
+      <!-- Analytics tab: hidden by default. Unlock with ?admin=<ADMIN_SECRET>
+           in the URL; the JS at page load stores a flag in localStorage so
+           subsequent visits keep it visible. -->
+      <button class="tab" data-tab="analytics" id="tabAnalytics" style="display:none;">Analytics</button>
       <button class="tab tab-support" data-tab="support" title="Help us extend the cal/val site">♥ Support</button>
     </div>
     <div class="credit">
@@ -1274,7 +1278,7 @@
            text badge (HLS/L8/MODIS/NISAR) plus name + description. -->
       <div class="card uav-sensor-card" id="satSensorCard">
         <div class="uav-sensor-row">
-          <div id="satSensorImg" class="sat-sensor-badge" style="background:#16a34a;">HLS</div>
+          <img id="satSensorImg" class="uav-sensor-img" src="photos/sat_payloads/HLS.png" alt="HLS">
           <div class="uav-sensor-text">
             <div class="uav-sensor-name" id="satSensorName">NASA HLS — Harmonized Landsat-Sentinel</div>
             <div class="uav-sensor-desc" id="satSensorDesc">30-m NDVI built from co-registered Landsat 8/9 (L30) and Sentinel-2 (S30) surface reflectance with Fmask cloud / shadow / water masking. 2-3 day combined revisit.</div>
@@ -1370,6 +1374,65 @@
           at the Hampyeong cal/val site. Click a visit on the left to view
           its photo set.
         </p>
+      </div>
+    </div>
+
+    <!-- Analytics (admin-only) — visible only when the visitor has unlocked
+         it via ?admin=<ADMIN_SECRET>. Cloudflare Web Analytics doesn't expose
+         a public stats API, so this tab opens the Cloudflare dashboard in a
+         new window rather than rendering inline charts. -->
+    <div class="side" id="side-analytics" style="display:none;">
+      <div class="station-id">Site analytics</div>
+
+      <div class="card">
+        <h4 style="margin-top:0;">Visitor stats</h4>
+        <p style="font-size:13px;line-height:1.55;color:var(--panel-text);">
+          Visitor counts, country breakdown, referrers, and top pages are
+          tracked via <b>Cloudflare Web Analytics</b>. The full dashboard
+          opens in a new tab:
+        </p>
+        <a id="analyticsOpenCf" class="btn"
+           href="https://dash.cloudflare.com/?to=/:account/web-analytics"
+           target="_blank" rel="noopener"
+           style="display:block;width:100%;text-align:center;text-decoration:none;margin-bottom:8px;">
+          Open Cloudflare Analytics dashboard ↗
+        </a>
+        <div style="font-size:11px;color:var(--muted);line-height:1.5;">
+          <b>Note on institution-level info:</b> Cloudflare reports country
+          and (paid plans only) ASN / city. Per-organization resolution
+          (e.g. "NASA JPL") would need a paid IP-intelligence service like
+          ipinfo.io or Clearbit — not provided by Cloudflare's free tier.
+        </div>
+      </div>
+
+      <div class="card">
+        <h4 style="margin-top:0;">Setup status</h4>
+        <div id="analyticsSetupStatus" style="font-size:12px;line-height:1.6;color:var(--panel-text);">
+          Checking…
+        </div>
+        <details style="margin-top:8px;">
+          <summary style="cursor:pointer;font-size:12px;color:var(--muted);">How to set up Cloudflare Web Analytics</summary>
+          <ol style="font-size:12px;line-height:1.6;color:var(--panel-text);padding-left:18px;margin-top:6px;">
+            <li>Go to <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener" style="color:#7dd3fc;">dash.cloudflare.com</a> → <b>Analytics &amp; Logs</b> → <b>Web Analytics</b>.</li>
+            <li>Click <b>Add a site</b>, choose <b>"with a JavaScript snippet"</b>, enter <code>hyunglok-kim.github.io</code>.</li>
+            <li>Copy the <code>data-cf-beacon</code> <b>token</b> (a 32-char hex string).</li>
+            <li>In <code>index.html</code>, find <code>YOUR_CF_TOKEN</code> in the Cloudflare beacon script near the bottom, replace it with your token, commit + push.</li>
+            <li>Data shows up in the Cloudflare dashboard within ~5 min.</li>
+          </ol>
+        </details>
+      </div>
+
+      <div class="card">
+        <h4 style="margin-top:0;">Tab visibility</h4>
+        <p style="font-size:12px;line-height:1.6;color:var(--panel-text);">
+          This tab is hidden by default. It becomes visible only after
+          loading the site with <code>?admin=&lt;secret&gt;</code> in the URL.
+          The unlock state is stored in <code>localStorage</code> so subsequent
+          visits keep it visible on this browser.
+        </p>
+        <button id="analyticsLockBtn" class="btn btn-secondary" style="width:100%;">
+          Re-lock (hide tab on this browser)
+        </button>
       </div>
     </div>
 
@@ -2891,7 +2954,7 @@ document.querySelectorAll(".tab").forEach(btn => {
     document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     const t = btn.dataset.tab;
-    ["insitu","uav","sat","model","ai","pic","support"].forEach(name => {
+    ["insitu","uav","sat","model","ai","pic","analytics","support"].forEach(name => {
       const sp = document.getElementById(`side-${name}`);
       if (sp) sp.style.display = (name === t) ? "" : "none";
     });
@@ -3607,47 +3670,47 @@ const SAT_TITLE = {
 
 const SAT_SENSOR = {
   "hls:ndvi": {
-    badge: "HLS",   bg: "#16a34a",
+    img:  "photos/sat_payloads/HLS.png",
     name: "NASA HLS — Harmonized Landsat-Sentinel",
     desc: "30-m NDVI built from co-registered Landsat 8/9 (L30) and Sentinel-2 (S30) surface reflectance with Fmask cloud / shadow / water masking. 2-3 day combined revisit.",
   },
   "landsat:lst": {
-    badge: "L8/9",  bg: "#0369a1",
+    img:  "photos/sat_payloads/Landsat.png",
     name: "Landsat 8 / 9 — TIRS thermal sensor",
     desc: "Collection-2 Level-2 ST_B10 surface temperature (°C) at 30 m, QA-pixel masked. 8-day combined revisit (16-day per platform).",
   },
   "modis:ndvi": {
-    badge: "MODIS", bg: "#0ea5e9",
+    img:  "photos/sat_payloads/MODIS.png",
     name: "MODIS Terra — MOD13A1",
     desc: "500-m 16-day NDVI composite. Daily Terra acquisitions composited to maximize cloud-free pixels.",
   },
   "modis:lst": {
-    badge: "MODIS", bg: "#0ea5e9",
+    img:  "photos/sat_payloads/MODIS.png",
     name: "MODIS Terra — MOD11A2",
     desc: "1-km 8-day daytime LST composite (°C). Aggregates clear-sky thermal observations from MODIS bands 31-32 split-window.",
   },
   "nisar:sm": {
-    badge: "NISAR", bg: "#7c3aed",
+    img:  "photos/sat_payloads/NISAR.png",
     name: "NASA-ISRO SAR (NISAR) — SM Beta",
     desc: "L-band SAR-derived soil-moisture beta product at 200 m. NISAR is the L-band cal/val anchor; this site is one of its validation nodes.",
   },
   "nisar:gist_sm": {
-    badge: "NISAR", bg: "#7c3aed",
+    img:  "photos/sat_payloads/NISAR.png",
     name: "NISAR — GIST SM beta",
     desc: "L-band SAR soil moisture, GIST-team retrieval (200 m).",
   },
   "nisar:hh": {
-    badge: "NISAR", bg: "#7c3aed",
+    img:  "photos/sat_payloads/NISAR.png",
     name: "NISAR — HH backscatter",
     desc: "Co-pol L-band backscatter (linear units, 200 m).",
   },
   "nisar:hv": {
-    badge: "NISAR", bg: "#7c3aed",
+    img:  "photos/sat_payloads/NISAR.png",
     name: "NISAR — HV backscatter",
     desc: "Cross-pol L-band backscatter (linear units, 200 m).",
   },
   "nisar:lia": {
-    badge: "NISAR", bg: "#7c3aed",
+    img:  "photos/sat_payloads/NISAR.png",
     name: "NISAR — Local Incidence Angle",
     desc: "Geometric incidence angle in degrees at 200 m, derived per pixel.",
   },
@@ -3691,13 +3754,10 @@ function ensureSatLoaded() {
 function updateSatSensorCard(source, product) {
   const meta = SAT_SENSOR[`${source}:${product}`];
   if (!meta) return;
-  const badge = document.getElementById("satSensorImg");
+  const img   = document.getElementById("satSensorImg");
   const name  = document.getElementById("satSensorName");
   const desc  = document.getElementById("satSensorDesc");
-  if (badge) {
-    badge.textContent = meta.badge;
-    badge.style.background = meta.bg;
-  }
+  if (img)  { img.src = meta.img; img.alt = meta.name; }
   if (name) name.textContent = meta.name;
   if (desc) desc.textContent = meta.desc;
 }
@@ -4207,6 +4267,85 @@ document.querySelectorAll(".uav-pill").forEach(btn => {
     setUavPayload(btn.dataset.payload);
   });
 });
+
+// =============================================================
+// Admin-only Analytics tab — unlock + setup status.
+//
+// Tab is hidden by default. Visit the site with ?admin=<ADMIN_SECRET> to
+// unlock it on this browser; the unlock flag is stored in localStorage,
+// so subsequent visits keep it visible. Click "Re-lock" inside the tab
+// to hide it again. Share the secret URL with anyone who should see
+// analytics; revoke by changing ADMIN_SECRET below + pushing.
+//
+// SECURITY NOTE: This is security-by-obscurity. The secret is in the HTML
+// source, so anyone who Views Source can find it. For a static site this
+// is generally acceptable — the actual analytics live in Cloudflare's
+// dashboard which requires Cloudflare login.
+// =============================================================
+const ADMIN_SECRET = "hp-cal-val-admin";       // change + redeploy to revoke
+const CF_BEACON_TOKEN = "YOUR_CF_TOKEN";       // paste your Cloudflare Web Analytics token here
+
+(function setupAnalyticsTab() {
+  const url = new URL(window.location.href);
+  const param = url.searchParams.get("admin");
+  if (param === ADMIN_SECRET) {
+    try { localStorage.setItem("hp_admin_unlocked", "1"); } catch (e) {}
+    // Strip the param from the URL so the secret doesn't sit in the
+    // address bar / get bookmarked / get logged in referrer headers.
+    url.searchParams.delete("admin");
+    history.replaceState({}, "", url.toString());
+  }
+  let unlocked = false;
+  try { unlocked = localStorage.getItem("hp_admin_unlocked") === "1"; } catch (e) {}
+  if (unlocked) {
+    const t = document.getElementById("tabAnalytics");
+    if (t) t.style.display = "";
+  }
+
+  // Setup status block (only meaningful when the tab is visible)
+  const status = document.getElementById("analyticsSetupStatus");
+  if (status) {
+    const tokenOk = CF_BEACON_TOKEN && CF_BEACON_TOKEN !== "YOUR_CF_TOKEN" && CF_BEACON_TOKEN.length >= 16;
+    const beacon  = document.querySelector('script[src*="cloudflareinsights.com/beacon"]');
+    status.innerHTML = `
+      <div>Beacon script in DOM: <b style="color:${beacon ? '#4ade80' : '#f87171'};">${beacon ? "yes" : "no"}</b></div>
+      <div>Token configured: <b style="color:${tokenOk ? '#4ade80' : '#f87171'};">${tokenOk ? "yes" : "no (still YOUR_CF_TOKEN)"}</b></div>
+      <div style="margin-top:6px;color:var(--muted);font-size:11px;">
+        ${tokenOk
+          ? "Tracking is active. Stats refresh every ~5 min on Cloudflare."
+          : "Until a real token is set, no visit data is sent — the tracker is a no-op."}
+      </div>`;
+  }
+
+  // Re-lock button: clear the unlock flag and reload (which hides the tab).
+  document.getElementById("analyticsLockBtn")?.addEventListener("click", () => {
+    try { localStorage.removeItem("hp_admin_unlocked"); } catch (e) {}
+    // If we're currently on the Analytics tab, switch to In-situ first
+    // so the user sees a sensible state after the hide.
+    document.querySelector('.tab[data-tab="insitu"]')?.click();
+    const t = document.getElementById("tabAnalytics");
+    if (t) t.style.display = "none";
+    alert("Analytics tab hidden. Re-unlock with ?admin=<secret> in the URL.");
+  });
+})();
+
+// =============================================================
+// Cloudflare Web Analytics beacon
+//
+// Inject the beacon only if a real token has been set, so the page doesn't
+// 404 / log noise during local development. To enable tracking:
+//   1. Get your token from Cloudflare → Web Analytics → site settings
+//   2. Replace CF_BEACON_TOKEN above with the 32-char hex value
+//   3. Commit + push; live site picks it up on next deploy
+// =============================================================
+(function injectCfBeacon() {
+  if (!CF_BEACON_TOKEN || CF_BEACON_TOKEN === "YOUR_CF_TOKEN") return;
+  const s = document.createElement("script");
+  s.defer = true;
+  s.src = "https://static.cloudflareinsights.com/beacon.min.js";
+  s.setAttribute("data-cf-beacon", JSON.stringify({ token: CF_BEACON_TOKEN }));
+  document.body.appendChild(s);
+})();
 </script>
 </body>
 </html>
