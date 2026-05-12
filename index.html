@@ -909,6 +909,97 @@
     height: 18px;
     box-shadow: 0 0 0 2px rgba(245,158,11,0.35);
   }
+
+  /* ============================================================
+     Mobile responsive layout (phones / narrow tablets).
+     Why: desktop uses multi-column grids that overflow on small
+     screens. Stack everything into a single column and shrink the
+     map so the page becomes scrollable instead of clipped.
+     ============================================================ */
+  @media (max-width: 768px) {
+    /* prevent any wide child from forcing horizontal scroll on the page */
+    html, body { overflow-x: hidden; }
+    .wrap { padding: 10px; max-width: 100%; }
+
+    /* top bar: stack tabs above credit, allow horizontal scroll on tabs */
+    .top-bar {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+    .tabs {
+      width: 100%;
+      overflow-x: auto;
+      flex-wrap: nowrap;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+    .tab {
+      padding: 8px 14px;
+      font-size: 13px;
+      flex: 0 0 auto;
+      white-space: nowrap;
+    }
+    .credit { white-space: normal; font-size: 11px; }
+
+    /* main layout: map column on top, info column underneath */
+    .layout {
+      grid-template-columns: 1fr;
+      padding: 10px;
+      gap: 12px;
+    }
+    .map-col, .side { min-width: 0; }
+    #map { height: 360px; }
+
+    /* map control rows: allow wrapping; clip anything that still won't fit */
+    .map-controls { padding: 10px; overflow-x: hidden; }
+    .map-controls .row {
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    /* colorbar prefix label can be very long ("NISAR (Beta) SM (m³/m³)") —
+       let it shrink and wrap so the gradient stays in-frame */
+    .cb-prefix { min-width: 0; flex: 0 1 auto; }
+    .colorbar { flex-wrap: wrap; }
+
+    /* UAV / satellite product pills: let them shrink to fit small screens */
+    .uav-pill,
+    .uav-pill[data-payload="lband"],
+    #satProductPills .uav-pill,
+    #satProductPills .uav-pill[data-source="nisar"] {
+      min-width: 0;
+      flex: 1 1 auto;
+      padding: 7px 8px;
+      font-size: 12px;
+    }
+    .sat-sensor-badge { width: 80px; height: 80px; font-size: 16px; }
+
+    /* L-band calendar: let it fill the column width */
+    .lband-cal, .lband-cal-controls { max-width: 100%; }
+
+    /* right-side card grids — collapse to single/double column */
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .row2 { grid-template-columns: 1fr; }
+    .photo-grid { grid-template-columns: repeat(2, 1fr); }
+
+    /* time-series chart shorter so it doesn't dominate the viewport */
+    #chart { height: 280px; }
+
+    /* pictures-tab gallery: smaller thumbs */
+    .pic-gallery { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+    .pic-folder-list { max-height: 220px; }
+
+    /* footer logos: leave more bottom padding so content isn't hidden */
+    body { padding-bottom: 80px; }
+  }
+
+  /* very narrow phones */
+  @media (max-width: 480px) {
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .photo-grid { grid-template-columns: 1fr 1fr; }
+    .tab { padding: 7px 12px; font-size: 12px; }
+    #map { height: 300px; }
+  }
 </style>
 </head>
 <body>
