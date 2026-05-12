@@ -4457,5 +4457,26 @@ const CF_BEACON_TOKEN = "d47bd3acc7f44026bcac8bfb1f11adfe";   // Cloudflare Web 
   document.body.appendChild(s);
 })();
 </script>
+<script>
+(function(){
+  if (window.parent === window) return;
+  function sendHeight(){
+    var h = Math.max(
+      document.documentElement.scrollHeight,
+      document.body.scrollHeight
+    );
+    window.parent.postMessage({ type: 'portalHeight', height: h }, '*');
+  }
+  window.addEventListener('load', sendHeight);
+  window.addEventListener('resize', sendHeight);
+  if (window.ResizeObserver) {
+    new ResizeObserver(sendHeight).observe(document.body);
+  } else {
+    setInterval(sendHeight, 1000);
+  }
+  setTimeout(sendHeight, 300);
+  setTimeout(sendHeight, 1500);
+})();
+</script>
 </body>
 </html>
