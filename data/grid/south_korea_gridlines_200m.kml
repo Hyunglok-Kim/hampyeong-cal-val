@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>South Korea_gridlines_M200M</name>
+    <Folder>
+      <name>Line 1</name>
+      <Placemark>
+        <Snippet maxLines="0"> </Snippet>
+        <description> </description>
+        <name>Segment 1</name>
+        <LineString>
+          <coordinates> 126.535269709543,35.1133673726556,0 126.545643153526,35.1133673726556,0</coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <Snippet maxLines="0"> </Snippet>
+        <description> </description>
+        <name>Segment 2</name>
+        <LineString>
+          <coordinates> 126.535269709543,35.1114576675807,0 126.545643153526,35.1114576675807,0</coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <Snippet maxLines="0"> </Snippet>
+        <description> </description>
+        <name>Segment 3</name>
+        <LineString>
+          <coordinates> 126.535269709543,35.1095480064553,0 126.545643153526,35.1095480064553,0</coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <Snippet maxLines="0"> </Snippet>
+        <description> </description>
+        <name>Segment 4</name>
+        <LineString>
+          <coordinates> 126.535269709543,35.1076383892741,0 126.545643153526,35.1076383892741,0</coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <Snippet maxLines="0"> </Snippet>
+        <description> </description>
+        <name>Segment 5</name>
+        <LineString>
+          <coordinates> 126.537344398339,35.115277121685,0 126.537344398339,35.1057288160321,0</coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <Snippet maxLines="0"> </Snippet>
+        <description> </description>
+        <name>Segment 6</name>
+        <LineString>
+          <coordinates> 126.539419087136,35.115277121685,0 126.539419087136,35.1057288160321,0</coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <Snippet maxLines="0"> </Snippet>
+        <description> </description>
+        <name>Segment 7</name>
+        <LineString>
+          <coordinates> 126.541493775933,35.115277121685,0 126.541493775933,35.1057288160321,0</coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <Snippet maxLines="0"> </Snippet>
+        <description> </description>
+        <name>Segment 8</name>
+        <LineString>
+          <coordinates> 126.543568464729,35.115277121685,0 126.543568464729,35.1057288160321,0</coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <Snippet maxLines="0"> </Snippet>
+        <description> </description>
+        <name>Segment 9</name>
+        <LineString>
+          <coordinates> 126.825726141078,35.1611242982424,0 126.836099585061,35.1611242982424,0</coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <Snippet maxLines="0"> </Snippet>
+        <description> </description>
+        <name>Segment 10</name>
+        <LineString>
+          <coordinates> 126.825726141078,35.159213492748,0 126.836099585061,35.159213492748,0</coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <Snippet maxLines="0"> </Snippet>
+        <description> </description>
+        <name>Segment 11</name>
+        <LineString>
+          <coordinates> 126.825726141078,35.1573027313325,0 126.836099585061,35.1573027313325,0</coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <Snippet maxLines="0"> </Snippet>
+        <description> </description>
+        <name>Segment 12</name>
+        <LineString>
+          <coordinates> 126.825726141078,35.1553920139909,0 126.836099585061,35.1553920139909,0</coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <Snippet maxLines="0"> </Snippet>
+        <description> </description>
+        <name>Segment 13</name>
+        <LineString>
+          <coordinates> 126.827800829875,35.1630351478211,0 126.827800829875,35.153481340718,0</coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <Snippet maxLines="0"> </Snippet>
+        <description> </description>
+        <name>Segment 14</name>
+        <LineString>
+          <coordinates> 126.829875518671,35.1630351478211,0 126.829875518671,35.153481340718,0</coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <Snippet maxLines="0"> </Snippet>
+        <description> </description>
+        <name>Segment 15</name>
+        <LineString>
+          <coordinates> 126.831950207468,35.1630351478211,0 126.831950207468,35.153481340718,0</coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <Snippet maxLines="0"> </Snippet>
+        <description> </description>
+        <name>Segment 16</name>
+        <LineString>
+          <coordinates> 126.834024896265,35.1630351478211,0 126.834024896265,35.153481340718,0</coordinates>
+        </LineString>
+      </Placemark>
+    </Folder>
+  </Document>
+</kml>

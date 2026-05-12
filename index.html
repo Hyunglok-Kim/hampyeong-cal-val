@@ -1752,8 +1752,31 @@ async function loadNestedGridKML(url, folderStyles) {
   return out;
 }
 
+// Draw every LineString from a simple gridlines KML as polylines on the
+// map. Used for the full 200 m grid network (no row/col bracketing).
+async function loadFlatGridKML(url, style) {
+  const text = await (await fetch(url)).text();
+  const dom  = new DOMParser().parseFromString(text, "text/xml");
+  const lines = [];
+  for (const ls of dom.getElementsByTagName("LineString")) {
+    const coords = ls.getElementsByTagName("coordinates")[0]?.textContent?.trim();
+    if (!coords) continue;
+    const pts = coords.split(/\s+/).map(s => {
+      const [lon, lat] = s.split(",").map(Number);
+      return [lat, lon];
+    }).filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+    if (pts.length >= 2) lines.push(pts);
+  }
+  return L.layerGroup(
+    lines.map(pts => L.polyline(pts, { pane: "gridPane", ...style }))
+  ).addTo(map);
+}
+
+loadFlatGridKML("data/grid/south_korea_gridlines_200m.kml", {
+  color: "#525252", weight: 0.8, opacity: 0.7,
+}).catch(err => console.warn("200 m grid KML load failure:", err));
+
 loadNestedGridKML("data/grid/nested_grids_200m_1km_3km_9km_36km.kml", {
-  "NISAR 200 m":   { color: "#525252",  weight: 1.5, opacity: 0.85 },
   "L2SMSP 1 km":   { color: "#000",     weight: 2.5, opacity: 1.0  },
   "L2SMSP 3 km":   { color: "#1d4ed8",  weight: 2.2, opacity: 0.95, dashArray: "8,4" },
   "L2SMSP 9 km":   { color: "#b91c1c",  weight: 2.5, opacity: 0.95, dashArray: "10,6" },
