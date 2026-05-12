@@ -952,10 +952,29 @@
     #map { height: 360px; }
 
     /* map control rows: allow wrapping; clip anything that still won't fit */
-    .map-controls { padding: 10px; overflow-x: hidden; }
+    .map-controls { padding: 10px; overflow-x: auto; }
     .map-controls .row {
       gap: 8px;
       flex-wrap: wrap;
+    }
+    /* each layer-row label holds [checkbox][select][slider][%][interpolate]
+       in a single inline-flex. On phones the select alone is wider than
+       the column, so let the label itself wrap and cap each child at the
+       container width. */
+    .map-controls .layer-row label {
+      flex-wrap: wrap;
+      max-width: 100%;
+      gap: 4px 6px;
+    }
+    .map-controls .layer-row label select {
+      max-width: 100%;
+      min-width: 0;
+      flex: 1 1 140px;
+    }
+    .map-controls .layer-row label input[type="range"] {
+      flex: 1 1 80px;
+      min-width: 60px;
+      max-width: 140px;
     }
     /* colorbar prefix label can be very long ("NISAR (Beta) SM (m³/m³)") —
        let it shrink and wrap so the gradient stays in-frame */
