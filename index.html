@@ -1753,7 +1753,7 @@ async function loadNestedGridKML(url, folderStyles) {
 }
 
 loadNestedGridKML("data/grid/nested_grids_200m_1km_3km_9km_36km.kml", {
-  // Only nested validation cells — not interior 200-m gridlines.
+  "NISAR 200 m":   { color: "#525252",  weight: 1.5, opacity: 0.85 },
   "L2SMSP 1 km":   { color: "#000",     weight: 2.5, opacity: 1.0  },
   "L2SMSP 3 km":   { color: "#1d4ed8",  weight: 2.2, opacity: 0.95, dashArray: "8,4" },
   "L2SMSP 9 km":   { color: "#b91c1c",  weight: 2.5, opacity: 0.95, dashArray: "10,6" },
