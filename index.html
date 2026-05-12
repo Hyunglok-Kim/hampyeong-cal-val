@@ -232,6 +232,8 @@
     max-width: 140px;
   }
   body { padding-bottom: 80px; }      /* leave room above the sticky footer */
+  body.hide-footer .logos-footer { display: none; }
+  body.hide-footer { padding-bottom: 0; }
   @media (max-width: 900px) {
     .logos-footer { padding: 6px 8px; }
     .logos-footer .logos-row { gap: 12px; }
@@ -4462,6 +4464,7 @@ const CF_BEACON_TOKEN = "d47bd3acc7f44026bcac8bfb1f11adfe";   // Cloudflare Web 
   try {
     var p = new URLSearchParams(window.location.search);
     if (p.get('embed') === '1') document.body.classList.add('embed');
+    if (p.get('hidefooter') === '1') document.body.classList.add('hide-footer');
   } catch (e) {}
 })();
 </script>
