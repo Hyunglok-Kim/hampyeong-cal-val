@@ -1073,7 +1073,7 @@
           <span class="overlay-info" id="overlayInfo">—</span>
         </div>
         <div class="row layer-row">
-          <label><input type="checkbox" id="layerStations" checked /> Station dots colored by SM</label>
+          <label><input type="checkbox" id="layerStations" checked /> Station dots colored by soil moisture</label>
           <label>
             <input type="checkbox" id="layerUAV" checked /> UAV
             <select id="uavProduct" title="UAV product">
@@ -1082,8 +1082,8 @@
               <option value="ndvi">NDVI (1 m)</option>
               <option value="ndwi">NDWI (1 m)</option>
               <option value="lidar">LiDAR DSM (1 m)</option>
-              <option value="sm_retr">L-band SM retrieved (25 m, m³/m³)</option>
-              <option value="sm_lgb" selected>L-band SM downscaled (1 m, m³/m³)</option>
+              <option value="sm_retr">L-band soil moisture retrieved (25 m, m³/m³)</option>
+              <option value="sm_lgb" selected>L-band soil moisture downscaled (1 m, m³/m³)</option>
               <option value="tb_v">L-band TBv (25 m, K)</option>
               <option value="tb_h">L-band TBh (25 m, K)</option>
             </select>
@@ -1112,8 +1112,8 @@
           <label>
             <input type="checkbox" id="layerNisar" /> NISAR (200 m)
             <select id="nisarProduct" title="NISAR variable">
-              <option value="sm">SM Beta (m³/m³)</option>
-              <option value="gist_sm">GIST SM Beta (m³/m³)</option>
+              <option value="sm">Soil moisture Beta (m³/m³)</option>
+              <option value="gist_sm">GIST soil moisture Beta (m³/m³)</option>
               <option value="hh">HH backscatter (linear)</option>
               <option value="hv">HV backscatter (linear)</option>
               <option value="lia">Local Incidence Angle (°)</option>
@@ -1292,8 +1292,8 @@
       <div class="card" id="polraSelectorCard" style="display:none;">
         <h4>Data</h4>
         <div class="lband-row">
-          <label><input type="radio" name="polraProduct" value="sm_retr" checked> SM retrieved (25 m, m³/m³)</label>
-          <label><input type="radio" name="polraProduct" value="sm_lgb"> SM downscaled (1 m, m³/m³)</label>
+          <label><input type="radio" name="polraProduct" value="sm_retr" checked> Soil moisture retrieved (25 m, m³/m³)</label>
+          <label><input type="radio" name="polraProduct" value="sm_lgb"> Soil moisture downscaled (1 m, m³/m³)</label>
           <label><input type="radio" name="polraProduct" value="tb_v"> TB<sub>V</sub> (25 m, K)</label>
           <label><input type="radio" name="polraProduct" value="tb_h"> TB<sub>H</sub> (25 m, K)</label>
         </div>
@@ -1330,7 +1330,7 @@
           <span class="lband-row-label">Variable:</span>
           <label><input type="radio" name="lbandVar" value="TB_V" checked> TB<sub>V</sub> (K)</label>
           <label><input type="radio" name="lbandVar" value="TB_H"> TB<sub>H</sub> (K)</label>
-          <label><input type="radio" name="lbandVar" value="SM"> SM (m³/m³)</label>
+          <label><input type="radio" name="lbandVar" value="SM"> Soil moisture (m³/m³)</label>
         </div>
         <div class="lband-row">
           <span class="lband-row-label">Products:</span>
@@ -1440,8 +1440,8 @@
       <div class="card" id="nisarSelectorCard" style="display:none;">
         <h4>NISAR variable</h4>
         <div class="lband-row">
-          <label><input type="radio" name="nisarSubProduct" value="sm" checked> SM Beta (m³/m³)</label>
-          <label><input type="radio" name="nisarSubProduct" value="gist_sm"> GIST SM (m³/m³)</label>
+          <label><input type="radio" name="nisarSubProduct" value="sm" checked> Soil moisture Beta (m³/m³)</label>
+          <label><input type="radio" name="nisarSubProduct" value="gist_sm"> GIST soil moisture (m³/m³)</label>
           <label><input type="radio" name="nisarSubProduct" value="hh"> HH backscatter (linear)</label>
           <label><input type="radio" name="nisarSubProduct" value="hv"> HV backscatter (linear)</label>
           <label><input type="radio" name="nisarSubProduct" value="lia"> Local Incidence Angle (°)</label>
@@ -1862,9 +1862,9 @@ const COLORBARS = {
            gradient: "linear-gradient(to right, rgb(30,80,30), rgb(80,160,60), rgb(220,200,80), rgb(220,130,50), rgb(200,50,40))" },
   gist_sm:{ label: "GIST Soil moisture", unit: "m³/m³", min: 0.05, max: 0.55,
            gradient: "linear-gradient(to right, rgb(120,60,20), rgb(220,160,60), rgb(80,170,220), rgb(20,60,160))" },
-  sm_retr:{ label: "L-band SM (retrieved)", unit: "m³/m³", min: 0.05, max: 0.55,
+  sm_retr:{ label: "L-band soil moisture (retrieved)", unit: "m³/m³", min: 0.05, max: 0.55,
            gradient: "linear-gradient(to right, rgb(120,60,20), rgb(220,160,60), rgb(80,170,220), rgb(20,60,160))" },
-  sm_lgb: { label: "L-band SM (downscaled)", unit: "m³/m³", min: 0.05, max: 0.55,
+  sm_lgb: { label: "L-band soil moisture (downscaled)", unit: "m³/m³", min: 0.05, max: 0.55,
            gradient: "linear-gradient(to right, rgb(120,60,20), rgb(220,160,60), rgb(80,170,220), rgb(20,60,160))" },
   tb_v:   { label: "L-band TBv",       unit: "K",     min: 200,  max: 280,
            gradient: "linear-gradient(to right, rgb(15,50,130), rgb(40,130,230), rgb(120,200,200), rgb(210,230,110), rgb(255,220,60), rgb(240,130,40), rgb(200,30,30))" },
@@ -2244,7 +2244,7 @@ function applyOverlay() {
       colorStationDots(row);
       const vals = Object.values(row).filter(v => typeof v === "number" && !isNaN(v));
       const mean = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : NaN;
-      info.push(`SM mean ${mean.toFixed(3)} m³/m³ (${usedDate}${usedDate !== dateStr ? ", nearest" : ""})`);
+      info.push(`Soil moisture mean ${mean.toFixed(3)} m³/m³ (${usedDate}${usedDate !== dateStr ? ", nearest" : ""})`);
     }
   } else {
     resetStationDots();
@@ -2359,7 +2359,7 @@ function renderColorbars({ showDots, showUAV, product, showSat, satProduct, show
     return div;
   };
   // 1) Station dots (always SM colormap)
-  if (showDots) container.appendChild(make(COLORBARS.sm, "Stations (SM)"));
+  if (showDots) container.appendChild(make(COLORBARS.sm, "Stations (Soil moisture)"));
 
   // 2) UAV product
   if (showUAV) {
@@ -3773,8 +3773,8 @@ const SAT_TITLE = {
   "landsat:lst":   "Landsat LST (30 m, 8-day, °C)",
   "modis:ndvi":    "MODIS NDVI (500 m, 16-day)",
   "modis:lst":     "MODIS LST (1 km, 8-day, °C)",
-  "nisar:sm":      "NISAR SM Beta (200 m, m³/m³)",
-  "nisar:gist_sm": "NISAR GIST SM (200 m, m³/m³)",
+  "nisar:sm":      "NISAR Soil moisture Beta (200 m, m³/m³)",
+  "nisar:gist_sm": "NISAR GIST Soil moisture (200 m, m³/m³)",
   "nisar:hh":      "NISAR HH backscatter (200 m, linear)",
   "nisar:hv":      "NISAR HV backscatter (200 m, linear)",
   "nisar:lia":     "NISAR Local Incidence Angle (200 m, °)",
@@ -3803,12 +3803,12 @@ const SAT_SENSOR = {
   },
   "nisar:sm": {
     img:  "photos/sat_payloads/NISAR.png",
-    name: "NASA-ISRO SAR (NISAR) — SM Beta",
+    name: "NASA-ISRO SAR (NISAR) — Soil moisture Beta",
     desc: "L-band SAR-derived soil-moisture beta product at 200 m. NISAR is the L-band cal/val anchor; this site is one of its validation nodes.",
   },
   "nisar:gist_sm": {
     img:  "photos/sat_payloads/NISAR.png",
-    name: "NISAR — GIST SM beta",
+    name: "NISAR — GIST soil moisture beta",
     desc: "L-band SAR soil moisture, GIST-team retrieval (200 m).",
   },
   "nisar:hh": {
