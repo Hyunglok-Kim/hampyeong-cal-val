@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document id="120">
+	<name>South_Korea_gridlines_M200M</name>
+	<atom:link rel="app" href="https://www.google.com/earth/about/versions/#earth-pro" title="Google Earth Pro 7.3.7.1155"></atom:link>
+	<Placemark id="122">
+		<LineString id="121">
+			<coordinates>
+				126.5456431535261,35.01793585576004,0 126.5560165975095,35.01793585576004,0 
+			</coordinates>
+		</LineString>
+	</Placemark>
+	<Placemark id="124">
+		<LineString id="123">
+			<coordinates>
+				126.5456431535261,35.01602834183534,0 126.5560165975095,35.01602834183534,0 
+			</coordinates>
+		</LineString>
+	</Placemark>
+	<Placemark id="126">
+		<LineString id="125">
+			<coordinates>
+				126.5456431535261,35.01412087160239,0 126.5560165975095,35.01412087160239,0 
+			</coordinates>
+		</LineString>
+	</Placemark>
+	<Placemark id="128">
+		<LineString id="127">
+			<coordinates>
+				126.5456431535261,35.01221344505608,0 126.5560165975095,35.01221344505608,0 
+			</coordinates>
+		</LineString>
+	</Placemark>
+	<Placemark id="130">
+		<LineString id="129">
+			<coordinates>
+				126.5477178423228,35.01984341338162,0 126.5477178423228,35.01030606219121,0 
+			</coordinates>
+		</LineString>
+	</Placemark>
+	<Placemark id="132">
+		<LineString id="131">
+			<coordinates>
+				126.5497925311195,35.01984341338162,0 126.5497925311195,35.01030606219121,0 
+			</coordinates>
+		</LineString>
+	</Placemark>
+	<Placemark id="134">
+		<LineString id="133">
+			<coordinates>
+				126.5518672199162,35.01984341338162,0 126.5518672199162,35.01030606219121,0 
+			</coordinates>
+		</LineString>
+	</Placemark>
+	<Placemark id="136">
+		<LineString id="135">
+			<coordinates>
+				126.5539419087128,35.01984341338162,0 126.5539419087128,35.01030606219121,0 
+			</coordinates>
+		</LineString>
+	</Placemark>
+</Document>
+</kml>
