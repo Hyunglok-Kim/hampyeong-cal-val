@@ -1,0 +1,13 @@
+,Value,Description,Source
+Latitude,35.0176604,,
+Longitude,126.5524424,,
+Altitude,15.694,,
+Type,Rice Paddy bank,,
+Installed,2/23/26,,
+Landcover_classification,Not Redeveloped Rice Paddy,Level-3 Land Cover Map,"The Environmental Geographic Information Service by the Ministry of Climate, Energy and Environment, Republic of Korea"
+Clay_fraction,16.7,Korean Soil Information System Data,"National Institute of Agricultural Sciences under the Rural Development Administration, Republic of Korea"
+Organic_carbon,2.1,Korean Soil Information System Data,"National Institute of Agricultural Sciences under the Rural Development Administration, Republic of Korea"
+Sand_fraction,23.0,Korean Soil Information System Data,"National Institute of Agricultural Sciences under the Rural Development Administration, Republic of Korea"
+Silt_fraction,60.3,Korean Soil Information System Data,"National Institute of Agricultural Sciences under the Rural Development Administration, Republic of Korea"
+Climate_classification,Cfa,Koeppen-Geiger 2007,Koeppen-Geiger Climate Classification
+Climate_classification,Cfa,Koeppen-Geiger 2017,Version 2017 Koeppen-Geiger Climate Classification

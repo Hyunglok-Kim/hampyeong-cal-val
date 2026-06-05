@@ -1,0 +1,13 @@
+,Value,Description,Source
+Latitude,35.0154376,,
+Longitude,126.5465411,,
+Altitude,41.45,,
+Type,Tree trunk,,
+Installed,10/18/25,,
+Landcover_classification,Deciduous Forest,Level-3 Land Cover Map,"The Environmental Geographic Information Service by the Ministry of Climate, Energy and Environment, Republic of Korea"
+Clay_fraction,26.4,Korean Soil Information System Data,"National Institute of Agricultural Sciences under the Rural Development Administration, Republic of Korea"
+Organic_carbon,1.4,Korean Soil Information System Data,"National Institute of Agricultural Sciences under the Rural Development Administration, Republic of Korea"
+Sand_fraction,5.8,Korean Soil Information System Data,"National Institute of Agricultural Sciences under the Rural Development Administration, Republic of Korea"
+Silt_fraction,67.8,Korean Soil Information System Data,"National Institute of Agricultural Sciences under the Rural Development Administration, Republic of Korea"
+Climate_classification,Cfa,Koeppen-Geiger 2007,Koeppen-Geiger Climate Classification
+Climate_classification,Cfa,Koeppen-Geiger 2017,Version 2017 Koeppen-Geiger Climate Classification

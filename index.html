@@ -1145,8 +1145,8 @@
 
     <div class="side" id="side-insitu">
       <!-- Network stats — populated after stations + per-station timeseries
-           checks complete. "Total" is the planned sensor count from
-           stations.csv (depths_cm × 2 + precipitation); "Active" counts
+           checks complete. "Planned" is the catalogued count from
+           stations.csv (sensor flavors × 2 for sm + temp). "Live" counts
            timeseries columns that currently have data. The gap is sensors
            that are catalogued but not yet streaming data. -->
       <div class="card stats-card" id="statsCard">
@@ -1167,7 +1167,7 @@
         </div>
         <div class="stats-hint">
           <b>Planned</b> is the catalogued count from <code>stations.csv</code>
-          (sensors per depth + precipitation).
+          (sm + temp per sensor flavor at each station).
           <b>Live</b> counts sensors whose timeseries currently has data — the
           gap is hardware not yet streaming.
         </div>
@@ -1656,9 +1656,9 @@
 // =============================================================
 // Config — change these if your file paths differ
 // =============================================================
-const STATIONS_CSV = "data/stations.csv";
-const TS_DIR     = "data/timeseries_hourly";   // 1-h aggregates used by the chart
-const TS_DIR_RAW = "data/timeseries";          // 5-min source data (download only)
+const STATIONS_CSV = "data/in_situ/stations.csv";
+const TS_DIR     = "data/in_situ/timeseries_hourly";   // 1-h aggregates used by the chart
+const TS_DIR_RAW = "data/in_situ/timeseries";          // 5-min source data (download only)
 const PHOTO_DIR = "photos";         // {station_id}_{season}.jpg
 
 // =============================================================
@@ -1816,6 +1816,15 @@ const PALETTE = {
   precip: ["#2a7596", "#3aa1c2"],
   other:  ["#9b6bd1", "#d14b6b", "#f0b820", "#3ab2c4", "#7aa15a"],
 };
+// Convert the new ISMN station id (HP1301) to the legacy filename token
+// used by the photo dirs (HP_13_1). Leading zeros in the per-grid sub-index
+// are dropped so HP0102 → HP_1_2.
+function photoIdFromStation(id) {
+  const m = /^HP(\d{2})(\d{2})$/.exec(String(id || ""));
+  if (!m) return String(id || "").replace(/-/g, "_");
+  return `HP_${parseInt(m[1], 10)}_${parseInt(m[2], 10)}`;
+}
+
 function categorize(name) {
   const n = String(name).toLowerCase();
   if (/(precip|rain|rainfall)/.test(n))            return "precip";
@@ -1943,8 +1952,8 @@ Papa.parse(STATIONS_CSV, {
   complete: (res) => {
     stations = res.data.filter(r => r.station_id);
     stations.forEach(addStationMarker);
-    // default to HP_13-1 (rice paddy in the cell center) when present
-    const defaultStation = stations.find(s => s.station_id === "HP_13-1") || stations[0];
+    // default to HP1301 (rice paddy in the cell center) when present
+    const defaultStation = stations.find(s => s.station_id === "HP1301") || stations[0];
     if (defaultStation) selectStation(defaultStation);
     loadOverlayData();   // daily SM + UAV catalog after stations are placed
     computeNetworkStats(stations);   // populate Network card
@@ -1953,15 +1962,15 @@ Papa.parse(STATIONS_CSV, {
 });
 
 // Network stats: total stations / total sensors / active sensors. Total
-// sensors are estimated from each station's depths_cm column (2 × n_depths
-// for sm+temp, plus precipitation = 1). Active sensors are counted by
-// fetching each timeseries CSV and tallying columns that have at least one
-// finite reading.
+// sensors are estimated from each station's sensor_flavors and depths_cm
+// columns: each flavor × each depth contributes 2 sensors (sm + temp).
+// Active sensors are counted by fetching each timeseries CSV and tallying
+// columns that have at least one finite reading.
 function _stationSensorCount(s) {
-  // depths_cm is like "0, 10" → 2 depths
-  const txt = String(s.depths_cm || "").trim();
-  const depths = txt ? txt.split(",").map(d => d.trim()).filter(Boolean) : [];
-  return Math.max(0, depths.length) * 2 + 1;     // sm + temp per depth + precip
+  const flavors = String(s.sensor_flavors || "").split(",").map(t => t.trim()).filter(Boolean);
+  // Each flavor has its own depth in the new ISMN layout (e.g. irr=10 cm,
+  // bank=20 cm, tree=-100 cm). So count is flavors × 2 (sm + temp).
+  return Math.max(0, flavors.length) * 2;
 }
 
 function computeNetworkStats(stationList) {
@@ -1979,7 +1988,7 @@ function computeNetworkStats(stationList) {
   if (pending === 0) { document.getElementById("statActiveSensors").textContent = 0; return; }
 
   stationList.forEach(s => {
-    const file = `${TS_DIR}/${String(s.station_id).replace(/-/g, "_")}.csv`;
+    const file = `${TS_DIR}/${s.station_id}.csv`;
     Papa.parse(file, {
       download: true, header: true, dynamicTyping: true, skipEmptyLines: true,
       complete: (res) => {
@@ -2002,11 +2011,12 @@ function computeNetworkStats(stationList) {
 }
 
 function loadOverlayData() {
-  // daily SM — derived on-the-fly from each station's timeseries. We always
-  // average `soil_moisture_10cm` (per user spec). 47 small CSV fetches in
+  // daily SM — derived on-the-fly from each station's timeseries. We
+  // average all near-surface soil-moisture columns per station (see
+  // isSmCol below). 47 small CSV fetches in
   // parallel is fast enough; no precomputed wide-format file needed.
   const parseTS = (s) => new Promise(resolve => {
-    const file = `${TS_DIR}/${s.station_id.replace(/-/g, "_")}.csv`;
+    const file = `${TS_DIR}/${s.station_id}.csv`;
     Papa.parse(file, {
       download: true, header: true, skipEmptyLines: true,
       dynamicTyping: (h) => h !== "time",
@@ -2016,17 +2026,26 @@ function loadOverlayData() {
   });
 
   Promise.all(stations.map(parseTS)).then(results => {
-    // byDate[date][station_id] = mean of soil_moisture_10cm for that day
+    // byDate[date][station_id] = mean of surface SM at the station for that day.
+    // The new ISMN schema spreads SM across sensor-flavored columns
+    // (sm_irr_10cm, sm_bank_20cm, sm_root_10cm, sm_field_10cm, sm_soil_10cm,
+    // sm_tree_above). For the daily overlay we average ALL near-surface
+    // sm_*_<N>cm columns at the station — excluding the above-ground tree
+    // trunk channel (sm_tree_above) which measures bole moisture, not soil.
+    const isSmCol = (k) => /^sm_/.test(k) && k !== "sm_tree_above";
     const byDate = {};
     results.forEach(({ s, rows }) => {
       const sums = {};
       rows.forEach(r => {
         if (!r.time) return;
-        const v = +r.soil_moisture_10cm;
-        if (!Number.isFinite(v)) return;
         const d = String(r.time).slice(0, 10);
-        const acc = sums[d] || (sums[d] = { sum: 0, n: 0 });
-        acc.sum += v; acc.n += 1;
+        for (const k of Object.keys(r)) {
+          if (!isSmCol(k)) continue;
+          const v = +r[k];
+          if (!Number.isFinite(v)) continue;
+          const acc = sums[d] || (sums[d] = { sum: 0, n: 0 });
+          acc.sum += v; acc.n += 1;
+        }
       });
       Object.entries(sums).forEach(([d, { sum, n }]) => {
         (byDate[d] || (byDate[d] = {}))[s.station_id] = sum / n;
@@ -2131,13 +2150,19 @@ function selectStation(s) {
 
   // header + info
   document.getElementById("stationLabel").textContent = `Station ID (${s.station_id})`;
+  const flavorTxt = s.sensor_flavors ? ` (${s.sensor_flavors})` : "";
+  const soilTxtParts = [];
+  if (s.clay_pct) soilTxtParts.push(`clay ${s.clay_pct}%`);
+  if (s.sand_pct) soilTxtParts.push(`sand ${s.sand_pct}%`);
+  if (s.silt_pct) soilTxtParts.push(`silt ${s.silt_pct}%`);
+  const soilTxt = soilTxtParts.length ? `<br>Soil texture: ${soilTxtParts.join(", ")}` : "";
   document.getElementById("stationInfo").innerHTML = `
     <b>${s.station_id}</b><br>
     Lat / Lon: ${(+s.lat).toFixed(5)}, ${(+s.lon).toFixed(5)}<br>
     Elevation: ${s.elevation_m} m<br>
     Land cover: ${s.land_cover}<br>
-    Sensor: ${s.sensor_model}<br>
-    Depths: ${s.depths_cm} cm
+    Sensor: ${s.sensor_model}${flavorTxt}<br>
+    Depths: ${s.depths_cm} cm${soilTxt}
   `;
   document.getElementById("stationNotes").innerHTML = `
     Installed: ${s.install_date}<br>
@@ -2148,10 +2173,11 @@ function selectStation(s) {
   // ordered candidate list (one student-installation shot, then sensor
   // close-ups, then extras). Missing photos are skipped silently; we keep
   // priority order, so the slots fill predictably regardless of load timing.
-  // station_id uses dashes (HP_1-2) but filenames use underscores (HP_1_2).
+  // station_id is the ISMN-style ID (HP1301); photo filenames use the
+  // legacy "HP_<grid>_<sub>" form with leading zeros stripped (HP_13_1).
   const grid = document.getElementById("photoGrid");
   grid.innerHTML = "";
-  const sidU = s.station_id.replace(/-/g, "_");
+  const sidU = photoIdFromStation(s.station_id);
   const MAX_PHOTOS = 4;
   const candidates = [
     `${PHOTO_DIR}/installation/${sidU}_Installation_1.png`,
@@ -2205,9 +2231,8 @@ function selectStation(s) {
     }
   }
 
-  // load timeseries — file uses underscores (HP_10_1.csv) while station_id uses
-  // dashes (HP_10-1), so normalize before lookup.
-  const tsFile = `${s.station_id.replace(/-/g, "_")}.csv`;
+  // load timeseries — station_id and filename now match (HP1001.csv).
+  const tsFile = `${s.station_id}.csv`;
   setChartMessage("Loading timeseries…");
   Papa.parse(`${TS_DIR}/${tsFile}`, {
     download: true,
@@ -2605,10 +2630,16 @@ function ensureVarState(vars) {
   const buckets = { sm: [], temp: [], precip: [], other: [] };
   vars.forEach(v => buckets[categorize(v)].push(v));
 
-  // default-checked variables: prefer 10 cm soil + precipitation. Fall back to
-  // the first variable in each category if those names aren't present (older
-  // / forest-only schemas).
-  const DEFAULT_ON = new Set(["soil_moisture_10cm", "soil_temperature_10cm", "precipitation"]);
+  // default-checked variables: prefer surface SM + matching temp across all
+  // sensor flavors (irr/bank/field/root/soil at 10 cm or 20 cm). Tree-trunk
+  // (sm_tree_above) is left unchecked by default since it's a niche channel.
+  const DEFAULT_ON = new Set([
+    "sm_irr_10cm",  "temp_irr_10cm",
+    "sm_bank_20cm", "temp_bank_20cm",
+    "sm_field_10cm","temp_field_10cm",
+    "sm_root_10cm", "temp_root_10cm",
+    "sm_soil_10cm", "temp_soil_10cm",
+  ]);
 
   varState = [];
   ["sm", "temp", "precip", "other"].forEach(cat => {
@@ -3030,7 +3061,7 @@ document.getElementById("downloadOne").addEventListener("click", () => {
   if (!currentStation) return alert("Select a station first.");
   const a = document.createElement("a");
   // serve the full-resolution raw 5-min file for downloads (chart uses hourly)
-  const file = `${currentStation.station_id.replace(/-/g, "_")}.csv`;
+  const file = `${currentStation.station_id}.csv`;
   a.href = `${TS_DIR_RAW}/${file}`;
   a.download = file;
   a.click();
