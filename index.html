@@ -913,7 +913,7 @@
     box-shadow: 0 0 0 2px rgba(245,158,11,0.35);
   }
   /* "Recent activity" pulse — applied when this station has data within
-     the last RECENT_DAYS. The animation just modulates a teal ring around
+     the last RECENT_DAYS. The animation just modulates a red ring around
      the dot; the dot's fill (SM-colormap) is untouched. */
   .station-dot.recent::after {
     content: "";
@@ -922,15 +922,15 @@
     width: 14px; height: 14px;
     border-radius: 50%;
     transform: translate(-50%, -50%);
-    box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.65);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.70);
     animation: stationPulse 2s ease-out infinite;
     pointer-events: none;
   }
   .station-dot.recent.selected::after { width: 18px; height: 18px; }
   @keyframes stationPulse {
-    0%   { box-shadow: 0 0 0 0   rgba(20,184,166,0.70); }
-    70%  { box-shadow: 0 0 0 10px rgba(20,184,166,0);   }
-    100% { box-shadow: 0 0 0 0   rgba(20,184,166,0);   }
+    0%   { box-shadow: 0 0 0 0   rgba(239,68,68,0.75); }
+    70%  { box-shadow: 0 0 0 10px rgba(239,68,68,0);   }
+    100% { box-shadow: 0 0 0 0   rgba(239,68,68,0);   }
   }
 
   /* ============================================================
@@ -2036,7 +2036,7 @@ function computeNetworkStats(stationList) {
 // freshest row across the whole network (so the indicator self-relativizes
 // — if every station were to advance by a year, the recency window still
 // works). The "recent" class drives the pulsing teal ring via CSS.
-const RECENT_DAYS = 7;
+const RECENT_DAYS = 30;
 function markRecentStations(lastTsByStation) {
   const dates = Object.values(lastTsByStation).filter(Boolean).sort();
   if (!dates.length) return;
