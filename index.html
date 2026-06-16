@@ -896,6 +896,7 @@
   }
   /* leaflet station markers */
   .station-dot {
+    position: relative;        /* anchor for .recent::after pulse */
     background: #1f8fff;
     border: 2px solid #0a3a72;
     border-radius: 50%;
@@ -910,6 +911,26 @@
     width: 18px;
     height: 18px;
     box-shadow: 0 0 0 2px rgba(245,158,11,0.35);
+  }
+  /* "Recent activity" pulse — applied when this station has data within
+     the last RECENT_DAYS. The animation just modulates a teal ring around
+     the dot; the dot's fill (SM-colormap) is untouched. */
+  .station-dot.recent::after {
+    content: "";
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.65);
+    animation: stationPulse 2s ease-out infinite;
+    pointer-events: none;
+  }
+  .station-dot.recent.selected::after { width: 18px; height: 18px; }
+  @keyframes stationPulse {
+    0%   { box-shadow: 0 0 0 0   rgba(20,184,166,0.70); }
+    70%  { box-shadow: 0 0 0 10px rgba(20,184,166,0);   }
+    100% { box-shadow: 0 0 0 0   rgba(20,184,166,0);   }
   }
 
   /* ============================================================
@@ -2010,6 +2031,27 @@ function computeNetworkStats(stationList) {
   });
 }
 
+// Toggle the .recent class on station-dot markers. A station counts as
+// recent when its newest timeseries row is within RECENT_DAYS of the
+// freshest row across the whole network (so the indicator self-relativizes
+// — if every station were to advance by a year, the recency window still
+// works). The "recent" class drives the pulsing teal ring via CSS.
+const RECENT_DAYS = 7;
+function markRecentStations(lastTsByStation) {
+  const dates = Object.values(lastTsByStation).filter(Boolean).sort();
+  if (!dates.length) return;
+  const newest = dates[dates.length - 1];           // YYYY-MM-DD
+  const newestMs = Date.parse(newest + "T00:00:00Z");
+  if (!Number.isFinite(newestMs)) return;
+  const cutoffMs = newestMs - RECENT_DAYS * 86400000;
+  document.querySelectorAll(".station-dot").forEach(el => {
+    const id = el.getAttribute("data-id");
+    const d  = lastTsByStation[id];
+    const ms = d ? Date.parse(d + "T00:00:00Z") : NaN;
+    el.classList.toggle("recent", Number.isFinite(ms) && ms >= cutoffMs);
+  });
+}
+
 function loadOverlayData() {
   // daily SM — derived on-the-fly from each station's timeseries. We
   // average all near-surface soil-moisture columns per station (see
@@ -2034,11 +2076,14 @@ function loadOverlayData() {
     // trunk channel (sm_tree_above) which measures bole moisture, not soil.
     const isSmCol = (k) => /^sm_/.test(k) && k !== "sm_tree_above";
     const byDate = {};
+    const lastTsByStation = {};   // station_id → "YYYY-MM-DD" of newest row
     results.forEach(({ s, rows }) => {
       const sums = {};
+      let lastDate = "";
       rows.forEach(r => {
         if (!r.time) return;
         const d = String(r.time).slice(0, 10);
+        if (d > lastDate) lastDate = d;
         for (const k of Object.keys(r)) {
           if (!isSmCol(k)) continue;
           const v = +r[k];
@@ -2047,12 +2092,14 @@ function loadOverlayData() {
           acc.sum += v; acc.n += 1;
         }
       });
+      if (lastDate) lastTsByStation[s.station_id] = lastDate;
       Object.entries(sums).forEach(([d, { sum, n }]) => {
         (byDate[d] || (byDate[d] = {}))[s.station_id] = sum / n;
       });
     });
     const dates = Object.keys(byDate).sort();
     dailySM = { dates, byDate };
+    markRecentStations(lastTsByStation);
     // initialize the date picker to the most recent in-situ date
     const di = document.getElementById("overlayDate");
     if (!di.value && dates.length) {
@@ -2719,16 +2766,27 @@ function renderChart() {
   const catToAxisIdx = {};
   catsPresent.forEach((c, i) => { catToAxisIdx[c] = i + 1; });
 
+  // Missing values arrive as empty strings (which `+""` would coerce to 0)
+  // or null from PapaParse's dynamicTyping. Pass null straight through so
+  // Plotly renders a gap instead of a misleading drop to zero.
+  const cell = (r, name) => {
+    const raw = r[name];
+    if (raw === null || raw === undefined || raw === "") return null;
+    const v = +raw;
+    return Number.isFinite(v) ? v : null;
+  };
+
   // build traces
   const traces = selected.map(v => {
     const idx = catToAxisIdx[v.cat];
     const op = (v.opacity != null) ? v.opacity : 1.0;
     const t = {
       x,
-      y: filtered.map(r => +r[v.name]),
+      y: filtered.map(r => cell(r, v.name)),
       name: v.name,
       yaxis: idx === 1 ? "y" : `y${idx}`,
       opacity: op,
+      connectgaps: false,
     };
     if (CAT_INFO[v.cat].kind === "bar") {
       t.type = "bar";
