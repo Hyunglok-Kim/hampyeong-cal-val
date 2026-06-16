@@ -60,7 +60,9 @@ def col_name(var: str, sensortype: str, depth_m: float) -> str:
 
 
 FILE_RE = re.compile(
-    r"^GIST_GIST_(HP\d{4})_([A-Z]{2})_([a-z]+)_(sm|temp)_(-?\d+\.\d+)_(-?\d+\.\d+)_(\d{8})\.csv$"
+    # Trailing _YYYYMMDD start-date is optional: the upstream dataset moved
+    # to the canonical ISMN naming (no date in the filename) in mid-2026.
+    r"^GIST_GIST_(HP\d{4})_([A-Z]{2})_([a-z]+)_(sm|temp)_(-?\d+\.\d+)_(-?\d+\.\d+)(?:_\d{8})?\.csv$"
 )
 META_RE = re.compile(r"^GIST_GIST_(HP\d{4})_([A-Z]{2})_([a-z]+)\.csv$")
 
@@ -69,10 +71,10 @@ def parse_data_file(p: Path):
     m = FILE_RE.match(p.name)
     if not m:
         return None
-    station, lc, st, var, df, dt, sdate = m.groups()
+    station, lc, st, var, df, dt = m.groups()
     return {
         "station": station, "lc": lc, "sensortype": st,
-        "var": var, "depth_m": float(df), "sdate": sdate,
+        "var": var, "depth_m": float(df),
         "path": p,
     }
 
