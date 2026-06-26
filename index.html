@@ -459,6 +459,14 @@
   }
   .stats-hint b { color: var(--panel-text); font-weight: 600; }
   .stats-hint code { font-size: 10px; color: var(--panel-text); }
+  .pulse-legend { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; }
+  .pulse-legend-dot {
+    display: inline-block; width: 10px; height: 10px;
+    background: #1f8fff; border: 2px solid #0a3a72; border-radius: 50%;
+    position: relative; flex-shrink: 0;
+    box-shadow: 0 0 0 0 rgba(239,68,68,0.75);
+    animation: stationPulse 2s ease-out infinite;
+  }
   .station-id {
     text-align: center;
     font-size: 16px;
@@ -1191,6 +1199,12 @@
           (sm + temp per sensor flavor at each station).
           <b>Live</b> counts sensors whose timeseries currently has data — the
           gap is hardware not yet streaming.
+          <br>
+          <span class="pulse-legend">
+            <span class="pulse-legend-dot"></span> Pulsing red ring marks
+            stations whose newest reading is within the last 30 days
+            (relative to the freshest reading in the network).
+          </span>
         </div>
       </div>
 
