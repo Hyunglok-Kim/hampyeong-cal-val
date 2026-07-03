@@ -197,6 +197,28 @@ Lab format has 5 variables per scene: NISAR(Beta) SM, GIST(Beta) SM, HH, HV,
 LIA. `prep_nisar.py` writes one overlay NC per variable (5 × N dates).
 Files in `_lab/` are kept as backup, `nc_to_overlay.py` skips them.
 
+### 6b. Sentinel-1 (C-band SAR backscatter, VV + VH)
+```bash
+/usr/bin/python3 download_sentinel1.py --project nodal-skein-411619
+/usr/bin/python3 download_sentinel1.py --project nodal-skein-411619 --start 2026-06-01 --end 2026-07-04
+/usr/bin/python3 download_sentinel1.py --project nodal-skein-411619 --vv-only  # or --vh-only
+/usr/bin/python3 nc_to_overlay.py data/satellites/
+```
+- Source: EE `COPERNICUS/S1_GRD`, IW mode only, VV + VH bands (EE already
+  serves both in dB after 10·log10 σ⁰). 10-m native resolution.
+- Both ascending (evening pass ~21:40 UTC) and descending (morning pass
+  ~09:31 UTC) are downloaded — the extra dimension is preserved via the
+  scene time in the NC filename + catalog row.
+- Written to `data/satellites/raw/S1_VV/` and `S1_VH/`. `nc_to_overlay.py`
+  renders each into a grayscale PNG (SAR convention: dark → bright) with
+  physical envelope `VV: −25..−5 dB`, `VH: −32..−12 dB`.
+- Catalog `source = sentinel1`, `product = s1_vv` / `s1_vh`. The
+  Satellite tab's Products card and the In-situ tab's Satellite dropdown
+  both have "S1 VV" / "S1 VH" pills / options wired to these keys.
+- New scenes: run `download_sentinel1.py --start <last_catalogued_date>`,
+  then `nc_to_overlay.py data/satellites/` — the safe-merge writer
+  preserves every pre-existing catalog row whose PNG is still on disk.
+
 ### 7. Visitor History (Pictures tab)
 ```bash
 # Drop folders into data/pictures/YYYYMMDD[_<title>]/.  Folder name rules:
@@ -265,10 +287,13 @@ Variables:
 Required global attrs:
   date         "YYYY-MM-DD"
   time         "HH:MM:SS"
-  product      sm | gist_sm | tir | lst | ndvi | lidar | rgb | hh | hv | lia
+  product      sm | gist_sm | tir | lst | ndvi | ndwi | lidar | rgb |
+               hh | hv | lia | tb_v | tb_h | sm_retr | sm_lgb |
+               s1_vv | s1_vh
   resolution_m float
 Optional global attrs:
-  source       modis | hls | landsat | sentinel | smap | nisar | ecostress
+  source       modis | hls | landsat | sentinel1 | sentinel |
+               smap | nisar | ecostress | lband
   title, description, crs ("EPSG:4326")
   valid_min / valid_max  on the data variable
 ```
@@ -321,6 +346,8 @@ when both are visible.
 | `lidar` | terrain (green → red) | 30 — 80 | m |
 | `hh`, `hv` | terrain (green → red) | 0 — 0.5 / 0.3 | linear |
 | `lia` | terrain (green → red) | 20 — 60 | ° |
+| `s1_vv` | grayscale (dark → bright) | −25 — −5 | dB |
+| `s1_vh` | grayscale (dark → bright) | −32 — −12 | dB |
 
 Python sources of truth: `nc_to_overlay.py`'s `PRODUCT_CMAP` and the per-product
 `cmap_*` functions. Legend gradients live in `index.html`'s `COLORBARS` object.
