@@ -1249,8 +1249,14 @@
       </div>
 
       <div class="actions">
-        <button class="btn" id="downloadOne">Download this station's data</button>
-        <button class="btn btn-secondary" id="downloadAll">Bulk download (all stations)</button>
+        <button class="btn" id="downloadOne">Request this station's data</button>
+        <button class="btn btn-secondary" id="downloadAll">Request bulk data (all stations)</button>
+      </div>
+      <div class="request-hint" style="font-size:12px;color:#666;margin-top:6px;line-height:1.4;">
+        Data requests are handled by email — no direct download from the
+        portal. Please include your name, affiliation, intended use, the
+        variables and time range you need. We will reply within a few
+        business days.
       </div>
     </div>
 
@@ -3129,23 +3135,33 @@ document.getElementById("basemapOpacity").addEventListener("input", e => {
 // =============================================================
 // Downloads
 // =============================================================
+// Data requests are handled by email — direct CSV download is intentionally
+// disabled so we can track usage, cite requestors in papers, and add a
+// paper-trail for institutional data-sharing agreements.
+function openDataRequestMail(stationId) {
+  const subject = encodeURIComponent(
+    stationId
+      ? `HydroAI - Hampyeong data request (${stationId})`
+      : "HydroAI - Hampyeong bulk data request"
+  );
+  const body = encodeURIComponent(
+    (stationId ? `Station: ${stationId}\n` : "") +
+    "Name:\n" +
+    "Affiliation:\n" +
+    "Intended use:\n" +
+    "Variables needed:\n" +
+    "Time range:\n"
+  );
+  window.location.href = `mailto:hyunglokkim@gmail.com?subject=${subject}&body=${body}`;
+}
+
 document.getElementById("downloadOne").addEventListener("click", () => {
   if (!currentStation) return alert("Select a station first.");
-  const a = document.createElement("a");
-  // serve the full-resolution raw 5-min file for downloads (chart uses hourly)
-  const file = `${currentStation.station_id}.csv`;
-  a.href = `${TS_DIR_RAW}/${file}`;
-  a.download = file;
-  a.click();
+  openDataRequestMail(currentStation.station_id);
 });
 
 document.getElementById("downloadAll").addEventListener("click", () => {
-  // simple approach: open a request form. Replace with your URL or mailto.
-  const subject = encodeURIComponent("HydroAI - Hampyeong bulk data request");
-  const body = encodeURIComponent(
-    "Name:\nAffiliation:\nIntended use:\nVariables needed:\nTime range:\n"
-  );
-  window.location.href = `mailto:hyunglokkim@gmail.com?subject=${subject}&body=${body}`;
+  openDataRequestMail(null);
 });
 
 // UAVs tab — download every currently-selected overlay's PNG. Browsers
