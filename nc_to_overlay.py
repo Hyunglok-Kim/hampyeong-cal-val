@@ -403,12 +403,36 @@ def main(arg=None):
         })
         print(f"  OK  {ncp.name}  →  {png_name}")
 
-    rows.sort(key=lambda r: (r["date"], r["time"], r["product"]))
+    # Merge with any pre-existing catalog rows. Raw NCs (data/{uav,satellites}
+    # /raw/) are gitignored, so a fresh checkout only has the rendered PNGs
+    # on disk. Rebuilding the catalog from scratch would drop every entry
+    # whose raw NC is missing, wiping months of history. We instead:
+    #   - key rows by (date, time, source, product)
+    #   - freshly-generated rows overwrite any pre-existing entry with the
+    #     same key (so if a scene was redownloaded, its metadata refreshes)
+    #   - pre-existing rows whose PNG is still on disk are preserved
+    #   - stale rows whose PNG is gone get dropped (self-cleaning)
+    existing = []
+    if catalog.exists():
+        with catalog.open() as f:
+            existing = list(csv.DictReader(f))
+
+    key = lambda r: (r["date"], r["time"], r.get("source", ""), r["product"])
+    merged = {key(r): r for r in existing}
+    for r in rows:
+        merged[key(r)] = r
+
+    kept = [r for r in merged.values() if (out_dir / r["file"]).exists()]
+    dropped = len(merged) - len(kept)
+
+    kept.sort(key=lambda r: (r["date"], r["time"], r["product"]))
     with catalog.open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=CATALOG_FIELDS)
         w.writeheader()
-        w.writerows(rows)
-    print(f"wrote {catalog}  ({len(rows)} entries)")
+        w.writerows(kept)
+    print(f"wrote {catalog}  ({len(kept)} entries; "
+          f"{len(rows)} regenerated, {len(existing)} pre-existing, "
+          f"{dropped} dropped as orphan PNGs)")
 
 
 if __name__ == "__main__":
