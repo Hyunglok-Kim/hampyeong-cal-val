@@ -153,6 +153,15 @@ def cmap_ndwi(field, vmin=-0.5, vmax=0.5, alpha=200):
     return _stack(r, g, b, alpha, mask_invalid=invalid)
 
 
+def cmap_grayscale(field, vmin=-25, vmax=-5, alpha=200):
+    """SAR-convention grayscale: dark = low backscatter, bright = high.
+    Any non-finite pixel becomes fully transparent."""
+    invalid = ~np.isfinite(field)
+    t = np.clip((field - vmin) / (vmax - vmin), 0.0, 1.0)
+    g = (t * 255).astype(np.float32)
+    return _stack(g, g, g, alpha, mask_invalid=invalid)
+
+
 def cmap_lidar(field, vmin=30, vmax=80, alpha=200):
     """Dark green → light green → yellow → orange → red."""
     t = np.clip((field - vmin) / (vmax - vmin), 0, 1)
@@ -201,6 +210,9 @@ PRODUCT_CMAP = {
     "hh":      (cmap_lidar, 0.00, 0.50, "linear"), # SAR backscatter — green→red ramp
     "hv":      (cmap_lidar, 0.00, 0.30, "linear"),
     "lia":     (cmap_lidar, 20.0, 60.0, "°"),      # Local Incidence Angle
+    # Sentinel-1 C-band backscatter (dB). SAR-convention grayscale.
+    "s1_vv":   (cmap_grayscale, -25.0, -5.0,  "dB"),
+    "s1_vh":   (cmap_grayscale, -32.0, -12.0, "dB"),
     # L-band radiometer brightness temperatures — reuse weather thermal cmap.
     # Range 200..280 K (typical L-band over land/veg).
     "tb_v":    (cmap_tir,   200.0, 280.0, "K"),
@@ -227,6 +239,8 @@ VAR_ALIASES = {
     "lia":     ["incidence_angle", "lia", "local_incidence_angle"],
     "tb_v":    ["tb_v", "brightness_temperature_v", "tbv"],
     "tb_h":    ["tb_h", "brightness_temperature_h", "tbh"],
+    "s1_vv":   ["s1_vv", "vv", "sigma0_vv", "backscatter_vv"],
+    "s1_vh":   ["s1_vh", "vh", "sigma0_vh", "backscatter_vh"],
 }
 
 
@@ -244,7 +258,10 @@ def read_nc(path):
         # source is optional (older NCs may not have it).  We normalize:
         #   pull the first matching token from a controlled vocabulary out of
         #   the NC's source attr OR the filename itself.
-        SOURCE_TOKENS = ("modis", "hls", "landsat", "sentinel", "smap", "nisar", "ecostress", "lband")
+        # "sentinel1" must come before "sentinel" — first substring match wins,
+        # and Sentinel-2 HLS scenes should stay tagged as "hls" (which comes
+        # first) rather than get bumped to the more generic "sentinel".
+        SOURCE_TOKENS = ("modis", "hls", "landsat", "sentinel1", "sentinel", "smap", "nisar", "ecostress", "lband")
         raw_src = (nc.getncattr("source") if "source" in nc.ncattrs() else "")
         haystack = (str(raw_src) + " " + path.stem).lower()
         source = ""

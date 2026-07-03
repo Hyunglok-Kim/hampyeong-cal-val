@@ -1130,6 +1130,8 @@
               <option value="landsat:lst">Landsat LST (30 m, 8-day, °C)</option>
               <option value="modis:ndvi">MODIS NDVI (500 m, 16-day)</option>
               <option value="modis:lst">MODIS LST (1 km, 8-day, °C)</option>
+              <option value="sentinel1:s1_vv">Sentinel-1 VV (10 m, ~6-day, dB)</option>
+              <option value="sentinel1:s1_vh">Sentinel-1 VH (10 m, ~6-day, dB)</option>
             </select>
             <input type="range" id="satOpacity" min="0" max="100" value="80"
                    title="Satellite opacity"
@@ -1943,6 +1945,11 @@ const COLORBARS = {
            gradient: "linear-gradient(to right, rgb(15,50,130), rgb(40,130,230), rgb(120,200,200), rgb(210,230,110), rgb(255,220,60), rgb(240,130,40), rgb(200,30,30))" },
   tb_h:   { label: "L-band TBh",       unit: "K",     min: 200,  max: 280,
            gradient: "linear-gradient(to right, rgb(15,50,130), rgb(40,130,230), rgb(120,200,200), rgb(210,230,110), rgb(255,220,60), rgb(240,130,40), rgb(200,30,30))" },
+  // Sentinel-1 C-band backscatter — SAR-convention grayscale (dark→bright).
+  s1_vv:  { label: "S1 VV backscatter", unit: "dB",  min: -25, max: -5,
+           gradient: "linear-gradient(to right, rgb(0,0,0), rgb(255,255,255))" },
+  s1_vh:  { label: "S1 VH backscatter", unit: "dB",  min: -32, max: -12,
+           gradient: "linear-gradient(to right, rgb(0,0,0), rgb(255,255,255))" },
 };
 
 // dry → wet colormap: dark brown → orange → light blue → deep blue.
@@ -3911,15 +3918,17 @@ document.getElementById("lbandOpacity").addEventListener("input", e => {
 // and above basemapPane (consistent with the In-situ tab's `layerSat`).
 // =============================================================
 const SAT_TITLE = {
-  "hls:ndvi":      "HLS NDVI (30 m, 2-3 day)",
-  "landsat:lst":   "Landsat LST (30 m, 8-day, °C)",
-  "modis:ndvi":    "MODIS NDVI (500 m, 16-day)",
-  "modis:lst":     "MODIS LST (1 km, 8-day, °C)",
-  "nisar:sm":      "NISAR Soil moisture Beta (200 m, m³/m³)",
-  "nisar:gist_sm": "NISAR GIST Soil moisture (200 m, m³/m³)",
-  "nisar:hh":      "NISAR HH backscatter (200 m, linear)",
-  "nisar:hv":      "NISAR HV backscatter (200 m, linear)",
-  "nisar:lia":     "NISAR Local Incidence Angle (200 m, °)",
+  "hls:ndvi":         "HLS NDVI (30 m, 2-3 day)",
+  "landsat:lst":      "Landsat LST (30 m, 8-day, °C)",
+  "modis:ndvi":       "MODIS NDVI (500 m, 16-day)",
+  "modis:lst":        "MODIS LST (1 km, 8-day, °C)",
+  "sentinel1:s1_vv":  "Sentinel-1 VV backscatter (10 m, ~6-day, dB)",
+  "sentinel1:s1_vh":  "Sentinel-1 VH backscatter (10 m, ~6-day, dB)",
+  "nisar:sm":         "NISAR Soil moisture Beta (200 m, m³/m³)",
+  "nisar:gist_sm":    "NISAR GIST Soil moisture (200 m, m³/m³)",
+  "nisar:hh":         "NISAR HH backscatter (200 m, linear)",
+  "nisar:hv":         "NISAR HV backscatter (200 m, linear)",
+  "nisar:lia":        "NISAR Local Incidence Angle (200 m, °)",
 };
 
 const SAT_SENSOR = {
@@ -3942,6 +3951,16 @@ const SAT_SENSOR = {
     img:  "photos/sat_payloads/MODIS.png",
     name: "MODIS Terra — MOD11A2",
     desc: "1-km 8-day daytime LST composite (°C). Aggregates clear-sky thermal observations from MODIS bands 31-32 split-window.",
+  },
+  "sentinel1:s1_vv": {
+    img:  "photos/sat_payloads/Sentinel1.png",
+    name: "ESA Sentinel-1 — C-band SAR (VV)",
+    desc: "10-m GRD co-pol backscatter (VV, dB). ESA C-band SAR, ~6-day combined revisit over Korea, both ascending and descending passes. Sensitive to surface roughness and near-surface soil moisture.",
+  },
+  "sentinel1:s1_vh": {
+    img:  "photos/sat_payloads/Sentinel1.png",
+    name: "ESA Sentinel-1 — C-band SAR (VH)",
+    desc: "10-m GRD cross-pol backscatter (VH, dB). Volume-scattering channel — driven mainly by vegetation biomass and canopy structure. Same acquisitions as the VV product.",
   },
   "nisar:sm": {
     img:  "photos/sat_payloads/NISAR.png",
