@@ -1917,7 +1917,6 @@ let satProductSource    = "hls";
 let satProductName      = "ndvi";
 let satCalDate          = new Date();
 let satLastClickedKey   = null;
-let _satCalInitDone     = false;
 const satSelections     = new Map();   // selKey → catalog row
 const satLayers         = new Map();   // selKey → Leaflet imageOverlay
 
@@ -2161,12 +2160,9 @@ function loadOverlayData() {
       // dates and the scene strip's UAV dots aren't clipped.
       if (currentTS && currentTS.length) renderChart();
       applyOverlay();
-      // One-time month-jump: land on the most recent UAV flight month so
-      // the user opens the UAVs tab to a useful view. Subsequent product
-      // switches preserve whatever month the user navigated to.
-      initUavCalendarMonth();
-      // Re-apply the active payload so its UI cards (PolRA selector,
-      // calendar dots) reflect the just-loaded catalog.
+      // Re-apply the active payload — this refreshes the UI cards (PolRA
+      // selector, calendar dots) AND jumps the calendar to the newest
+      // month for that payload (see setUavPayload → jumpUavCalendarToLatest).
       setUavPayload(uavPayload);
     },
     error: (err) => console.warn("UAV catalog not found (optional)", err),
@@ -3417,21 +3413,6 @@ let lbandCalDate = new Date();      // currently displayed month (1st of month i
 let lbandSelectedDates = new Set();   // YYYY-MM-DD strings — multi-select
 let lbandLayers = [];               // active Leaflet layers for the current selection
 
-// One-time calendar month jump: land on whichever month contains the most
-// recent UAV flight (across ALL product types). Called once when the UAV
-// catalog finishes loading. Subsequent product-pill switches don't touch
-// lbandCalDate — the user keeps whatever month they navigated to.
-let _uavCalInitDone = false;
-function initUavCalendarMonth() {
-  if (_uavCalInitDone) return;
-  if (!uavCatalog.length) return;
-  const dates = uavCatalog.map(r => r.date).filter(Boolean).sort();
-  if (!dates.length) return;
-  const last = new Date(dates[dates.length - 1] + "T00:00:00");
-  lbandCalDate = new Date(last.getFullYear(), last.getMonth(), 1);
-  _uavCalInitDone = true;
-}
-
 function ensureLbandLoaded() {
   if (lbandCatalog) {
     renderLbandCalendar();
@@ -4022,21 +4003,11 @@ function scenesForActivePill() {
 }
 
 function ensureSatLoaded() {
-  // satCatalog is loaded eagerly at page start (see [sat] catalog loaded log).
-  // First visit to the tab → jump the calendar to the month of the most
-  // recent scene of the default (HLS:NDVI) pill.
-  if (_satCalInitDone) { renderSatCalendar(); return; }
+  // satCatalog is loaded eagerly at page start. Every entry into the tab
+  // just re-runs setSatProduct() for the currently active pill so the
+  // calendar always lands on the month of that product's newest scene.
   if (!satCatalog.length) { renderSatCalendar(); return; }
-  const dates = satCatalog
-    .filter(r => r.source === satProductSource && r.product === satProductName)
-    .map(r => r.date).sort();
-  if (dates.length) {
-    const last = new Date(dates[dates.length - 1] + "T00:00:00");
-    satCalDate = new Date(last.getFullYear(), last.getMonth(), 1);
-  }
-  _satCalInitDone = true;
-  renderSatCalendar();
-  setSatProduct(satProductSource, satProductName);   // populate sensor card etc.
+  setSatProduct(satProductSource, satProductName);
 }
 
 function updateSatSensorCard(source, product) {
@@ -4050,12 +4021,27 @@ function updateSatSensorCard(source, product) {
   if (desc) desc.textContent = meta.desc;
 }
 
+// Move the satellite calendar to the month containing the most recent
+// catalogued scene for (source, product). Called on every pill / sub-
+// product switch so the user always lands on data instead of "current
+// month = empty".
+function jumpSatCalendarToLatest(source, product) {
+  if (!satCatalog || !satCatalog.length) return;
+  const dates = satCatalog
+    .filter(r => r.source === source && r.product === product)
+    .map(r => r.date).sort();
+  if (!dates.length) return;
+  const last = new Date(dates[dates.length - 1] + "T00:00:00");
+  satCalDate = new Date(last.getFullYear(), last.getMonth(), 1);
+}
+
 function setSatProduct(source, product) {
   satProductSource = source;
   satProductName   = product;
   document.getElementById("satProductTitle").textContent =
     SAT_TITLE[`${source}:${product}`] || `${source} ${product}`;
   updateSatSensorCard(source, product);
+  jumpSatCalendarToLatest(source, product);
   document.getElementById("nisarSelectorCard").style.display =
     (source === "nisar") ? "" : "none";
   document.getElementById("sentinel1SelectorCard").style.display =
@@ -4324,6 +4310,7 @@ document.querySelectorAll('input[name="nisarSubProduct"]').forEach(r => {
         document.getElementById("satProductTitle").textContent =
           SAT_TITLE[`nisar:${v}`] || `NISAR ${v}`;
         updateSatSensorCard("nisar", v);
+        jumpSatCalendarToLatest("nisar", v);
       }
     }
     // Swap layer for every active NISAR selection in place.
@@ -4369,6 +4356,7 @@ document.querySelectorAll('input[name="sentinel1SubProduct"]').forEach(r => {
         document.getElementById("satProductTitle").textContent =
           SAT_TITLE[`sentinel1:${v}`] || `Sentinel-1 ${v}`;
         updateSatSensorCard("sentinel1", v);
+        jumpSatCalendarToLatest("sentinel1", v);
       }
     }
     // Swap in place for every active Sentinel-1 selection.
@@ -4526,17 +4514,33 @@ function updateSensorCard(payload) {
   if (desc) desc.textContent = meta.desc;
 }
 
+// Move the UAV calendar to the month of the most recent flight for this
+// payload. Called on every pill switch so the user lands on data.
+function jumpUavCalendarToLatest(payload) {
+  if (payload === "lband") {
+    const dates = Object.keys(flightsForPayload("lband")).sort();
+    if (dates.length) {
+      const last = new Date(dates[dates.length - 1] + "T00:00:00");
+      lbandCalDate = new Date(last.getFullYear(), last.getMonth(), 1);
+    }
+    return;
+  }
+  if (!uavCatalog || !uavCatalog.length) return;
+  const dates = uavCatalog
+    .filter(r => r.product === payload)
+    .map(r => r.date).sort();
+  if (!dates.length) return;
+  const last = new Date(dates[dates.length - 1] + "T00:00:00");
+  lbandCalDate = new Date(last.getFullYear(), last.getMonth(), 1);
+}
+
 function setUavPayload(payload) {
   // Selections persist across product switches — RGB-04-30 + NDVI-04-30
   // can be on the map simultaneously. Just update the active product.
   uavPayload = payload;
   document.getElementById("uavPayloadTitle").textContent = PAYLOAD_TITLE[payload] || payload;
   updateSensorCard(payload);
-
-  // The calendar month is intentionally NOT changed when the user switches
-  // product pills — they keep whatever month they were navigating. The
-  // initial month-jump (to the most recent UAV flight overall) happens
-  // once, in initUavCalendarMonth() on first catalog load.
+  jumpUavCalendarToLatest(payload);
 
   // L-band has two UI modes:
   //   • catalog.json mode → calibration + selector + variable radios
