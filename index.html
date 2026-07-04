@@ -1423,11 +1423,7 @@
             <span class="uav-pill-sub">1 km · 8-day</span>
           </button>
           <button class="uav-pill" data-source="sentinel1" data-product="s1_vv" type="button">
-            <span class="uav-pill-name">Sentinel-1 VV</span>
-            <span class="uav-pill-sub">10 m · ~6-day · dB</span>
-          </button>
-          <button class="uav-pill" data-source="sentinel1" data-product="s1_vh" type="button">
-            <span class="uav-pill-name">Sentinel-1 VH</span>
+            <span class="uav-pill-name">Sentinel-1</span>
             <span class="uav-pill-sub">10 m · ~6-day · dB</span>
           </button>
           <button class="uav-pill" data-source="nisar" data-product="sm" type="button">
@@ -1496,6 +1492,17 @@
           <label><input type="radio" name="nisarSubProduct" value="hh"> HH backscatter (linear)</label>
           <label><input type="radio" name="nisarSubProduct" value="hv"> HV backscatter (linear)</label>
           <label><input type="radio" name="nisarSubProduct" value="lia"> Local Incidence Angle (°)</label>
+        </div>
+      </div>
+
+      <!-- Sentinel-1 sub-product card — shown only when the active source
+           is "sentinel1". Same pattern as NISAR: pick a polarization here
+           and any already-selected S1 overlays swap in place. -->
+      <div class="card" id="sentinel1SelectorCard" style="display:none;">
+        <h4>Sentinel-1 polarization</h4>
+        <div class="lband-row">
+          <label><input type="radio" name="sentinel1SubProduct" value="s1_vv" checked> VV backscatter (dB)</label>
+          <label><input type="radio" name="sentinel1SubProduct" value="s1_vh"> VH backscatter (dB)</label>
         </div>
       </div>
 
@@ -4051,10 +4058,17 @@ function setSatProduct(source, product) {
   updateSatSensorCard(source, product);
   document.getElementById("nisarSelectorCard").style.display =
     (source === "nisar") ? "" : "none";
-  // Re-sync the NISAR sub-product radio to the active product when the user
-  // taps the NISAR pill itself (so the radio reflects the displayed variable).
+  document.getElementById("sentinel1SelectorCard").style.display =
+    (source === "sentinel1") ? "" : "none";
+  // Re-sync the sub-product radio to the active product when the user
+  // taps the NISAR / Sentinel-1 pill itself (so the radio reflects the
+  // displayed variable).
   if (source === "nisar") {
     const r = document.querySelector(`input[name="nisarSubProduct"][value="${product}"]`);
+    if (r) r.checked = true;
+  }
+  if (source === "sentinel1") {
+    const r = document.querySelector(`input[name="sentinel1SubProduct"][value="${product}"]`);
     if (r) r.checked = true;
   }
   renderSatCalendar();
@@ -4335,6 +4349,57 @@ document.querySelectorAll('input[name="nisarSubProduct"]').forEach(r => {
     // Mirror into the In-situ NISAR dropdown so the legend strip is right.
     const nisarSel = document.getElementById("nisarProduct");
     if (nisarSel && [...nisarSel.options].some(o => o.value === v)) nisarSel.value = v;
+    renderSatCalendar();
+    applyOverlay();
+  });
+});
+
+// Sentinel-1 sub-product radio: same pattern as NISAR — flip the pill's
+// data-product, swap any already-placed S1 overlays in place, and mirror
+// the choice into the In-situ tab's Satellite dropdown so the legend
+// stays consistent.
+document.querySelectorAll('input[name="sentinel1SubProduct"]').forEach(r => {
+  r.addEventListener("change", () => {
+    const v = document.querySelector('input[name="sentinel1SubProduct"]:checked').value;
+    const s1Pill = document.querySelector('#satProductPills .uav-pill[data-source="sentinel1"]');
+    if (s1Pill) {
+      s1Pill.dataset.product = v;
+      if (s1Pill.classList.contains("active")) {
+        satProductName = v;
+        document.getElementById("satProductTitle").textContent =
+          SAT_TITLE[`sentinel1:${v}`] || `Sentinel-1 ${v}`;
+        updateSatSensorCard("sentinel1", v);
+      }
+    }
+    // Swap in place for every active Sentinel-1 selection.
+    [...satSelections.keys()].filter(k => k.startsWith("sentinel1_")).forEach(oldKey => {
+      const oldRow = satSelections.get(oldKey);
+      // S1 has multiple passes per day (asc/desc) — match on date AND time
+      // so we swap the correct pass rather than an arbitrary one.
+      const newRow = satCatalog.find(rr =>
+        rr.source === "sentinel1" && rr.product === v &&
+        rr.date === oldRow.date && rr.time === oldRow.time
+      );
+      const oldLayer = satLayers.get(oldKey);
+      if (oldLayer) { map.removeLayer(oldLayer); satLayers.delete(oldKey); }
+      satSelections.delete(oldKey);
+      if (!newRow) return;
+      const newKey = _satKey(newRow);
+      const bounds = [[+newRow.s, +newRow.w], [+newRow.n, +newRow.e]];
+      const op = +(document.getElementById("satOpacity")?.value || 80) / 100;
+      const lyr = L.imageOverlay(`data/satellites/${newRow.file}`, bounds, {
+        opacity: op, interactive: false, pane: "satellitePane",
+      }).addTo(map);
+      satSelections.set(newKey, newRow);
+      satLayers.set(newKey, lyr);
+      if (oldKey === satLastClickedKey) satLastClickedKey = newKey;
+    });
+    // Mirror into the In-situ Satellite dropdown so the legend strip matches.
+    const satSel = document.getElementById("satProduct");
+    if (satSel) {
+      const target = `sentinel1:${v}`;
+      if ([...satSel.options].some(o => o.value === target)) satSel.value = target;
+    }
     renderSatCalendar();
     applyOverlay();
   });
