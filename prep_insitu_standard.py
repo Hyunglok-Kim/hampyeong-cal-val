@@ -32,6 +32,7 @@ Run:
     python3 prep_insitu_standard.py
 """
 import csv
+import json
 import re
 import shutil
 from collections import defaultdict
@@ -141,6 +142,15 @@ def main():
     OUT_META.mkdir(parents=True, exist_ok=True)
 
     stations_rows = []   # for stations.csv
+    # ── overlay + pulse indices (pre-computed here so index.html doesn't
+    # ── have to fetch + parse 47 hourly CSVs on every page load).
+    daily_by_date = {}         # "YYYY-MM-DD" → { station_id → mean surface SM }
+    last_ts_by_station = {}    # station_id → "YYYY-MM-DD" of newest row
+
+    def is_surface_sm(col):
+        """Which columns feed the surface-SM map dot / pulse recency.
+        `sm_tree_above` is above-ground bole moisture, not soil."""
+        return col.startswith("sm_") and col != "sm_tree_above"
 
     for station in sorted(by_station):
         files = by_station[station]
@@ -187,6 +197,20 @@ def main():
                 rec = rows[t]
                 w.writerow([t.strftime("%Y-%m-%d %H:%M:%S"),
                             *[rec.get(c, "") for c in cols]])
+
+        # daily surface-SM mean for this station (feeds the map dot color
+        # overlay + the "recent" pulse-ring window).
+        daily_sums = defaultdict(lambda: [0.0, 0])
+        for t, rec in rows.items():
+            day = t.strftime("%Y-%m-%d")
+            for c, v in rec.items():
+                if is_surface_sm(c):
+                    daily_sums[day][0] += v
+                    daily_sums[day][1] += 1
+        for day, (s, n) in daily_sums.items():
+            if n:
+                daily_by_date.setdefault(day, {})[station] = round(s / n, 3)
+        last_ts_by_station[station] = max(t.strftime("%Y-%m-%d") for t in rows)
 
         # hourly aggregation
         hourly = defaultdict(lambda: defaultdict(lambda: [0.0, 0]))
@@ -297,6 +321,21 @@ def main():
     for meta_p in sorted((SRC / "Metadata").glob("GIST_GIST_*.csv")):
         shutil.copy2(meta_p, OUT_META / meta_p.name.replace("GIST_GIST_", ""))
     print(f"[done] copied {len(list(OUT_META.glob('*.csv')))} metadata files")
+
+    # ───────────────────────────────────────────── overlay / pulse indices
+    # Single small JSON avoids the browser having to fetch + parse every
+    # station's hourly CSV on page load just to color the map dots.
+    daily_json = OUT / "daily_sm.json"
+    with daily_json.open("w") as fp:
+        json.dump({
+            "dates": sorted(daily_by_date.keys()),
+            "byDate": daily_by_date,
+        }, fp, separators=(",", ":"))
+    last_ts_json = OUT / "last_ts.json"
+    with last_ts_json.open("w") as fp:
+        json.dump(last_ts_by_station, fp, separators=(",", ":"))
+    print(f"[done] wrote {daily_json.name} ({len(daily_by_date)} days) "
+          f"+ {last_ts_json.name} ({len(last_ts_by_station)} stations)")
 
     if lc_disagreements:
         print()

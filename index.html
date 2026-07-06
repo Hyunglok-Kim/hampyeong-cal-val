@@ -2040,36 +2040,24 @@ function computeNetworkStats(stationList) {
   const totalSensors  = stationList.reduce((a, s) => a + _stationSensorCount(s), 0);
   document.getElementById("statTotalStations").textContent = totalStations;
   document.getElementById("statTotalSensors").textContent  = totalSensors;
+  // "Active" now == the number of stations whose newest reading is within
+  // the RECENT_DAYS pulse window, multiplied by their catalogued sensor
+  // count. Uses the pre-computed last_ts.json (already fetched below),
+  // so we no longer download 47 hourly CSVs just to fill this stat.
   document.getElementById("statActiveSensors").textContent = "—";
-
-  // Tally active sensors in the background. Each station's timeseries CSV
-  // is fetched, and every non-time column with at least one finite value
-  // counts as one active sensor.
-  let activeSensors = 0;
-  let pending = stationList.length;
-  if (pending === 0) { document.getElementById("statActiveSensors").textContent = 0; return; }
-
-  stationList.forEach(s => {
-    const file = `${TS_DIR}/${s.station_id}.csv`;
-    Papa.parse(file, {
-      download: true, header: true, dynamicTyping: true, skipEmptyLines: true,
-      complete: (res) => {
-        if (res.data && res.data.length) {
-          const cols = Object.keys(res.data[0]).filter(k => k && k !== "time");
-          for (const c of cols) {
-            const hasFinite = res.data.some(r => Number.isFinite(+r[c]));
-            if (hasFinite) activeSensors++;
-          }
-        }
-        if (--pending === 0) {
-          document.getElementById("statActiveSensors").textContent = activeSensors;
-        }
-      },
-      error: () => { if (--pending === 0) {
-        document.getElementById("statActiveSensors").textContent = activeSensors;
-      } },
+  fetch("data/in_situ/last_ts.json").then(r => r.json()).then(map => {
+    const dates = Object.values(map).sort();
+    if (!dates.length) { document.getElementById("statActiveSensors").textContent = 0; return; }
+    const newest = Date.parse(dates[dates.length - 1] + "T00:00:00Z");
+    const cutoff = newest - RECENT_DAYS * 86400000;
+    let active = 0;
+    stationList.forEach(s => {
+      const d = map[s.station_id];
+      const ms = d ? Date.parse(d + "T00:00:00Z") : NaN;
+      if (Number.isFinite(ms) && ms >= cutoff) active += _stationSensorCount(s);
     });
-  });
+    document.getElementById("statActiveSensors").textContent = active;
+  }).catch(() => { document.getElementById("statActiveSensors").textContent = "?"; });
 }
 
 // Toggle the .recent class on station-dot markers. A station counts as
@@ -2094,59 +2082,23 @@ function markRecentStations(lastTsByStation) {
 }
 
 function loadOverlayData() {
-  // daily SM — derived on-the-fly from each station's timeseries. We
-  // average all near-surface soil-moisture columns per station (see
-  // isSmCol below). 47 small CSV fetches in
-  // parallel is fast enough; no precomputed wide-format file needed.
-  const parseTS = (s) => new Promise(resolve => {
-    const file = `${TS_DIR}/${s.station_id}.csv`;
-    Papa.parse(file, {
-      download: true, header: true, skipEmptyLines: true,
-      dynamicTyping: (h) => h !== "time",
-      complete: (res) => resolve({ s, rows: res.data }),
-      error:    ()    => resolve({ s, rows: [] }),  // missing file → no dot color
-    });
-  });
-
-  Promise.all(stations.map(parseTS)).then(results => {
-    // byDate[date][station_id] = mean of surface SM at the station for that day.
-    // The new ISMN schema spreads SM across sensor-flavored columns
-    // (sm_irr_10cm, sm_bank_20cm, sm_root_10cm, sm_field_10cm, sm_soil_10cm,
-    // sm_tree_above). For the daily overlay we average ALL near-surface
-    // sm_*_<N>cm columns at the station — excluding the above-ground tree
-    // trunk channel (sm_tree_above) which measures bole moisture, not soil.
-    const isSmCol = (k) => /^sm_/.test(k) && k !== "sm_tree_above";
-    const byDate = {};
-    const lastTsByStation = {};   // station_id → "YYYY-MM-DD" of newest row
-    results.forEach(({ s, rows }) => {
-      const sums = {};
-      let lastDate = "";
-      rows.forEach(r => {
-        if (!r.time) return;
-        const d = String(r.time).slice(0, 10);
-        if (d > lastDate) lastDate = d;
-        for (const k of Object.keys(r)) {
-          if (!isSmCol(k)) continue;
-          const v = +r[k];
-          if (!Number.isFinite(v)) continue;
-          const acc = sums[d] || (sums[d] = { sum: 0, n: 0 });
-          acc.sum += v; acc.n += 1;
-        }
-      });
-      if (lastDate) lastTsByStation[s.station_id] = lastDate;
-      Object.entries(sums).forEach(([d, { sum, n }]) => {
-        (byDate[d] || (byDate[d] = {}))[s.station_id] = sum / n;
-      });
-    });
-    const dates = Object.keys(byDate).sort();
-    dailySM = { dates, byDate };
-    markRecentStations(lastTsByStation);
-    // initialize the date picker to the most recent in-situ date
+  // Fast path — read the precomputed daily surface-SM index + last-timestamp
+  // index that prep_insitu_standard.py writes. Replaces the old 47-way
+  // Papa.parse fanout (was ~6 MB across 47 hourly CSVs on every page load;
+  // now it's two small JSON fetches ~110 KB total).
+  Promise.all([
+    fetch("data/in_situ/daily_sm.json").then(r => r.json()),
+    fetch("data/in_situ/last_ts.json").then(r => r.json()),
+  ]).then(([daily, lastTs]) => {
+    dailySM = { dates: daily.dates || [], byDate: daily.byDate || {} };
+    markRecentStations(lastTs || {});
     const di = document.getElementById("overlayDate");
-    if (!di.value && dates.length) {
-      di.value = dates[dates.length - 1];
+    if (!di.value && dailySM.dates.length) {
+      di.value = dailySM.dates[dailySM.dates.length - 1];
     }
     applyOverlay();
+  }).catch(err => {
+    console.error("failed to load in-situ overlay indices", err);
   });
 
   // UAV catalog
