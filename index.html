@@ -5,13 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Hampyeong Cal/Val Site - HydroAI</title>
 
+<!-- Warm the CDN connections early; the script tags themselves live at the
+     bottom of <body> so the UI markup paints before ~400 KB of JS downloads. -->
+<link rel="preconnect" href="https://unpkg.com" crossorigin />
+<link rel="preconnect" href="https://cdn.plot.ly" crossorigin />
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- basic dist = scatter/bar/pie only — all this page uses. Full bundle is
-     1.1 MB gz vs 340 KB gz for basic, and it's render-blocking, so this is
-     the single biggest first-paint win. -->
-<script src="https://cdn.plot.ly/plotly-basic-2.32.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
 <style>
   :root {
@@ -1053,9 +1052,55 @@
     .tab { padding: 7px 12px; font-size: 12px; }
     #map { height: 300px; }
   }
+/* Boot overlay — painted with the first HTML bytes, dismissed by
+   dismissBootOverlay() once stations are on the map (or by its own
+   15 s safety timer if anything upstream fails). */
+#bootOverlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #efeae0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 16px;
+  transition: opacity .35s ease;
+}
+#bootOverlay.done { opacity: 0; pointer-events: none; }
+.boot-spinner {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 4px solid rgba(31, 111, 204, .22);
+  border-top-color: #1f6fcc;
+  animation: bootSpin .9s linear infinite;
+}
+.boot-text {
+  font-size: 14px; font-weight: 500; color: #6b6257;
+  letter-spacing: .02em;
+}
+@keyframes bootSpin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
+<script>
+// Runs before first paint (body exists once the parser is here):
+// 1) apply embed-mode classes so the iframe never flashes desktop chrome;
+// 2) arm the boot-overlay dismissal — normally called from the stations
+//    load callback, with a 15 s safety net in case anything fails.
+(function () {
+  try {
+    var p = new URLSearchParams(window.location.search);
+    if (p.get("embed") === "1") document.body.classList.add("embed");
+    if (p.get("hidefooter") === "1") document.body.classList.add("hide-footer");
+  } catch (e) {}
+  window.dismissBootOverlay = function () {
+    var el = document.getElementById("bootOverlay");
+    if (!el || el.classList.contains("done")) return;
+    el.classList.add("done");
+    setTimeout(function () { el.remove(); }, 400);
+  };
+  setTimeout(window.dismissBootOverlay, 15000);
+})();
+</script>
+<div id="bootOverlay" aria-hidden="true">
+  <div class="boot-spinner"></div>
+  <div class="boot-text">Loading Hampyeong Cal/Val Portal…</div>
+</div>
 <div class="wrap">
 
   <!-- TOP BAR: tabs on the left, credit on the right -->
@@ -1713,6 +1758,16 @@
   </div>
 </footer>
 
+<!-- Libraries load here — after all UI markup — so the skeleton paints
+     immediately instead of the page blanking while ~400 KB gz of JS
+     downloads. Classic (non-defer) tags keep strict execution order:
+     Leaflet → Plotly → PapaParse → the app script below. -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- basic dist = scatter/bar/pie only — all this page uses. Full bundle is
+     1.1 MB gz vs 340 KB gz for basic. -->
+<script src="https://cdn.plot.ly/plotly-basic-2.32.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
 <script>
 // =============================================================
 // Config — change these if your file paths differ
@@ -1762,39 +1817,27 @@ map.createPane("gridPane").style.zIndex      = 380;
 // markers stay in the default markerPane (z 600) → above everything raster
 
 // =============================================================
-// EASE-Grid 2.0 nested grids — single lab-supplied KML, but only the cell
-// containing the Hampyeong site center is drawn at each scale (one
-// rectangle per scale, nested 1 km → 3 km → 9 km → 36 km).
-//   data/grid/nested_grids_200m_1km_3km_9km_36km.kml
-// Each folder in the KML stores row + col grid lines (e.g. "L2SMSP 9 km
-// row 12", "L2SMSP 9 km col 7"). We extract the row latitudes and column
-// longitudes, find the four lines bracketing SITE_CENTER, and assemble
-// just that one cell as a rectangle.
+// EASE-Grid 2.0 nested grids — derived from the lab-supplied KML, but only
+// the cell containing the Hampyeong site center is drawn at each scale
+// (one rectangle per scale, nested 1 km → 3 km → 9 km → 36 km).
+// The 3.9 MB KML is no longer fetched by the browser: kml_to_gridjson.py
+// pre-extracts each folder's row-line latitudes + column-line longitudes
+// into data/grid/nested_grids.json (~4 KB gz). The bracketing logic below
+// is unchanged; re-run the converter if the lab ever ships a new KML.
 // =============================================================
-async function loadNestedGridKML(url, folderStyles) {
-  const text = await (await fetch(url)).text();
-  const dom  = new DOMParser().parseFromString(text, "text/xml");
+async function loadNestedGridJSON(url, folderStyles) {
+  const spec = await (await fetch(url)).json();
   const out  = {};
   const [siteLat, siteLon] = SITE_CENTER;
 
-  for (const f of dom.getElementsByTagName("Folder")) {
-    const folderName = f.getElementsByTagName("name")[0]?.textContent.trim() || "";
-    const style = folderStyles[folderName];
-    if (!style) continue;
-
-    // Each row placemark = horizontal line at fixed lat; col placemark =
-    // vertical line at fixed lon. Sample the first coordinate of each.
-    const rowLats = new Set(), colLons = new Set();
-    for (const pm of f.getElementsByTagName("Placemark")) {
-      const pmName  = pm.getElementsByTagName("name")[0]?.textContent || "";
-      const coords  = pm.getElementsByTagName("coordinates")[0]?.textContent?.trim();
-      if (!coords) continue;
-      const first = coords.split(/\s+/)[0].split(",").map(Number);   // [lon, lat, alt]
-      if (/\brow\b/i.test(pmName))      rowLats.add(first[1]);
-      else if (/\bcol\b/i.test(pmName)) colLons.add(first[0]);
+  for (const [folderName, style] of Object.entries(folderStyles)) {
+    const f = (spec.folders || {})[folderName];
+    if (!f) {
+      console.warn(`[grid] "${folderName}" not present in ${url}`);
+      continue;
     }
-    const lats = [...rowLats].sort((a, b) => a - b);
-    const lons = [...colLons].sort((a, b) => a - b);
+    const lats = [...f.rowLats].sort((a, b) => a - b);
+    const lons = [...f.colLons].sort((a, b) => a - b);
 
     // Find the bracketing lines around the site center.
     const bot   = [...lats].reverse().find(v => v <= siteLat);
@@ -1837,7 +1880,7 @@ loadFlatGridKML("data/grid/hp_gridlines_200m.kml", {
   color: "#525252", weight: 0.8, opacity: 0.7,
 }).catch(err => console.warn("200 m grid KML load failure:", err));
 
-loadNestedGridKML("data/grid/nested_grids_200m_1km_3km_9km_36km.kml", {
+loadNestedGridJSON("data/grid/nested_grids.json", {
   "L2SMSP 1 km":   { color: "#000",     weight: 2.5, opacity: 1.0  },
   "L2SMSP 3 km":   { color: "#1d4ed8",  weight: 2.2, opacity: 0.95, dashArray: "8,4" },
   "L2SMSP 9 km":   { color: "#b91c1c",  weight: 2.5, opacity: 0.95, dashArray: "10,6" },
@@ -2022,8 +2065,13 @@ Papa.parse(STATIONS_CSV, {
     if (defaultStation) selectStation(defaultStation);
     loadOverlayData();   // daily SM + UAV catalog after stations are placed
     computeNetworkStats(stations);   // populate Network card
+    // Map + markers are interactive — drop the boot skeleton.
+    window.dismissBootOverlay?.();
   },
-  error: (err) => console.error("Failed to load stations.csv", err),
+  error: (err) => {
+    console.error("Failed to load stations.csv", err);
+    window.dismissBootOverlay?.();   // don't strand the user behind the overlay
+  },
 });
 
 // Network stats: total stations / total sensors / active sensors. Total
@@ -4652,15 +4700,8 @@ const CF_BEACON_TOKEN = "d47bd3acc7f44026bcac8bfb1f11adfe";   // Cloudflare Web 
   document.body.appendChild(s);
 })();
 </script>
-<script>
-(function(){
-  try {
-    var p = new URLSearchParams(window.location.search);
-    if (p.get('embed') === '1') document.body.classList.add('embed');
-    if (p.get('hidefooter') === '1') document.body.classList.add('hide-footer');
-  } catch (e) {}
-})();
-</script>
+<!-- embed / hidefooter param handling moved to the top of <body> so the
+     classes apply before first paint (no flash of desktop chrome). -->
 <script>
 (function(){
   if (window.parent === window) return;
