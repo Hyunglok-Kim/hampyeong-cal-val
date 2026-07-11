@@ -3900,8 +3900,10 @@ function renderModelChart() {
         x: rows.map(r => r.date), y: yy,
         name: `${MODEL_META[m].label} precip`,
         type: "bar", yaxis: "y2",
-        marker: { color: MODEL_META[m].color, opacity: 0.32 },
-        hovertemplate: "%{y:.1f} mm<extra></extra>",
+        marker: { color: MODEL_META[m].color, opacity: 0.45 },
+        // label the model in the unified tooltip (<extra></extra> hides the
+        // default name box, so name it explicitly here)
+        hovertemplate: "%{fullData.name}: %{y:.1f} mm<extra></extra>",
       });
     }
   }
@@ -3911,9 +3913,10 @@ function renderModelChart() {
   const traces = [...band, ...precipTraces, ...lines];
   if (!lines.length) {
     Plotly.purge(el);
-    const why = missing.length
+    let why = missing.length
       ? `No ${info.title.toLowerCase()} data for the selected model(s): ${missing.join(", ")}.`
       : "Select at least one model.";
+    if (precipTraces.length) why += " (Precipitation is only shown alongside a primary variable.)";
     el.innerHTML = `<div class="chart-msg">${why}</div>`;
     renderModelMetrics();
     return;
@@ -3933,15 +3936,18 @@ function renderModelChart() {
     yaxis: { title: { text: `${info.title} (${info.unit})` } },
     legend: { orientation: "h", y: -0.15 },
     hovermode: "x unified",
-    barmode: "overlay",
+    barmode: "group",   // multiple models' precip bars sit side-by-side
   };
   if (precipTraces.length) {
     // Reversed hyetograph on the right: bars hang from the top, given 3×
     // headroom so they never collide with the primary series below.
+    // showgrid/zeroline off so this axis doesn't add a second, misaligned
+    // set of horizontal gridlines over the primary axis.
     layout.yaxis2 = {
       title: { text: "Precip (mm/day)" },
       overlaying: "y", side: "right",
       range: [Math.max(1, maxP) * 3, 0],
+      showgrid: false, zeroline: false,
     };
   }
   Plotly.react(el, traces, layout, { responsive: true, displaylogo: false });
