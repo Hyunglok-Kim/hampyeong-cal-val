@@ -1052,6 +1052,17 @@
     .tab { padding: 7px 12px; font-size: 12px; }
     #map { height: 300px; }
   }
+/* Models tab — full-width chart on top, controls as a wrapping row below
+   (instead of the default chart-left / panel-right split). Toggled by the
+   `models-mode` class on the .layout container from the tab handler. */
+.layout.models-mode { grid-template-columns: 1fr; }
+#modelChart { height: 62vh; min-height: 420px; }
+.layout.models-mode #side-model {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start;
+}
+.layout.models-mode #side-model > .station-id { flex-basis: 100%; margin: 0 0 2px; }
+.layout.models-mode #side-model > .card { flex: 1 1 260px; margin: 0; }
+
 /* About Data tab — readable article column */
 .about-article {
   max-width: 820px;
@@ -1298,7 +1309,7 @@
           47-station network mean.
         </div>
       </div>
-      <div id="modelChart" style="width:100%;height:520px;"></div>
+      <div id="modelChart" style="width:100%;"></div>
     </div>
     <div class="map-col" id="mapCol">
       <div id="map"></div>
@@ -1803,7 +1814,9 @@
           <label><input type="radio" name="modelVar" value="sm_surface" checked> Surface soil moisture (m³/m³)</label>
           <label><input type="radio" name="modelVar" value="sm_rootzone"> Root-zone soil moisture (m³/m³)</label>
           <label><input type="radio" name="modelVar" value="soil_temp_c"> Soil temperature (°C)</label>
-          <label><input type="radio" name="modelVar" value="precip_mm"> Precipitation (mm/day)</label>
+          <label style="margin-top:6px;border-top:1px solid var(--border-dark);padding-top:6px;">
+            <input type="checkbox" id="modelShowPrecip" checked>
+            Overlay precipitation (mm/day, bars)</label>
         </div>
       </div>
 
@@ -3662,6 +3675,8 @@ document.querySelectorAll(".tab").forEach(btn => {
     document.getElementById("picMainCol").style.display   = showPic   ? "" : "none";
     document.getElementById("aboutMainCol").style.display = showAbout ? "" : "none";
     document.getElementById("modelMainCol").style.display = showModel ? "" : "none";
+    // Models uses a full-width top chart + controls-below layout.
+    document.getElementById("view-insitu").classList.toggle("models-mode", showModel);
 
     if (!showPic && !showAbout && !showModel) {
       map.invalidateSize();                            // map div size may have changed
@@ -3850,10 +3865,9 @@ function renderModelChart() {
     }
   }
 
-  // Model series (all variables). Models without the variable are noted.
-  // Guard empty/null explicitly — +"" and +null coerce to 0 (finite), which
-  // would otherwise draw a bogus flat-zero line (e.g. GLDAS has no precip,
-  // ERA5-Land has no root-zone column).
+  // Primary-variable model series. Guard empty/null explicitly — +"" and
+  // +null coerce to 0 (finite), which would otherwise draw a bogus
+  // flat-zero line (ERA5-Land has no root-zone column).
   for (const m of _modelChecked()) {
     const rows = (_modelData[m] || []).filter(r => modelNum(r[varName]) !== null);
     if (!rows.length) { missing.push(MODEL_META[m].label); continue; }
@@ -3867,9 +3881,32 @@ function renderModelChart() {
     });
   }
 
+  // Precipitation overlay (bars, secondary reversed axis) — the hydrologic
+  // forcing shown alongside whatever the primary variable is. Per selected
+  // model that has precip; GLDAS has none and is simply skipped.
+  const showPrecip = document.getElementById("modelShowPrecip")?.checked;
+  const precipTraces = [];
+  let maxP = 0;
+  if (showPrecip) {
+    for (const m of _modelChecked()) {
+      const rows = (_modelData[m] || []).filter(r => modelNum(r.precip_mm) !== null);
+      if (!rows.length) continue;
+      const yy = rows.map(r => +r.precip_mm);
+      maxP = Math.max(maxP, ...yy);
+      precipTraces.push({
+        x: rows.map(r => r.date), y: yy,
+        name: `${MODEL_META[m].label} precip`,
+        type: "bar", yaxis: "y2",
+        marker: { color: MODEL_META[m].color, opacity: 0.32 },
+        hovertemplate: "%{y:.1f} mm<extra></extra>",
+      });
+    }
+  }
+
   const el = document.getElementById("modelChart");
-  const traces = [...band, ...lines];
-  if (!traces.length) {
+  // Bars (precip) first so the primary lines paint on top of them.
+  const traces = [...band, ...precipTraces, ...lines];
+  if (!lines.length) {
     Plotly.purge(el);
     const why = missing.length
       ? `No ${info.title.toLowerCase()} data for the selected model(s): ${missing.join(", ")}.`
@@ -3885,14 +3922,26 @@ function renderModelChart() {
   document.getElementById("modelChartSubtitle").innerHTML =
     `Daily <b>${info.title.toLowerCase()}</b> at the site pixel` +
     (isSM ? ", vs the 47-station network mean and one chosen station" : "") +
+    (precipTraces.length ? " · precipitation as bars (right axis)" : "") +
     note + ".";
-  Plotly.react(el, traces, {
-    margin: { l: 55, r: 15, t: 10, b: 40 },
+  const layout = {
+    margin: { l: 55, r: precipTraces.length ? 55 : 15, t: 10, b: 40 },
     xaxis: { type: "date" },
     yaxis: { title: { text: `${info.title} (${info.unit})` } },
     legend: { orientation: "h", y: -0.15 },
     hovermode: "x unified",
-  }, { responsive: true, displaylogo: false });
+    barmode: "overlay",
+  };
+  if (precipTraces.length) {
+    // Reversed hyetograph on the right: bars hang from the top, given 3×
+    // headroom so they never collide with the primary series below.
+    layout.yaxis2 = {
+      title: { text: "Precip (mm/day)" },
+      overlaying: "y", side: "right",
+      range: [Math.max(1, maxP) * 3, 0],
+    };
+  }
+  Plotly.react(el, traces, layout, { responsive: true, displaylogo: false });
   renderModelMetrics();
 }
 
@@ -3968,7 +4017,7 @@ function renderModelMetrics() {
 // Model tab controls → re-render (checkboxes, variable radio, station select,
 // spread toggle).
 document.querySelectorAll(
-  '#modelToggles input, input[name="modelVar"], #modelStation, #modelShowSpread'
+  '#modelToggles input, input[name="modelVar"], #modelStation, #modelShowSpread, #modelShowPrecip'
 ).forEach(el => el.addEventListener("change", renderModelChart));
 
 // =============================================================
