@@ -7,7 +7,10 @@
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<!-- basic dist = scatter/bar/pie only — all this page uses. Full bundle is
+     1.1 MB gz vs 340 KB gz for basic, and it's render-blocking, so this is
+     the single biggest first-paint win. -->
+<script src="https://cdn.plot.ly/plotly-basic-2.32.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
 <style>
