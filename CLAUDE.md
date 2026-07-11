@@ -400,8 +400,8 @@ render as a crisp grid. The "interpolate" checkbox toggles this class off.
 
 ## Tabs
 
-Tab bar order: **About Data** · In-situ (default active) · UAVs · Satellites ·
-Models · AI prediction · Visitor History · Support.
+Tab bar order: In-situ (default active) · UAVs · Satellites · Models ·
+AI prediction · Visitor History · **About Data** · Support.
 
 - **About Data** — first-time-visitor explainer of everything the site
   collects (site geometry, in-situ network, UAV payloads, satellite product

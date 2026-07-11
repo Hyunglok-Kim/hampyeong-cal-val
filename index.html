@@ -1058,7 +1058,9 @@
   padding: 6px 10px 24px;
   font-size: 14px;
   line-height: 1.65;
-  color: var(--panel-text, #333);
+  color: var(--text, #0f172a);   /* article sits on the white map column,
+                                    NOT the dark side panel — don't use
+                                    --panel-text here */
 }
 .about-article h2 { font-size: 21px; margin: 8px 0 4px; }
 .about-article h3 { font-size: 16px; margin: 22px 0 6px; border-bottom: 1px solid var(--border, #ddd); padding-bottom: 4px; }
@@ -1126,7 +1128,6 @@
   <!-- TOP BAR: tabs on the left, credit on the right -->
   <div class="top-bar">
     <div class="tabs" id="tabs">
-      <button class="tab" data-tab="about">About Data</button>
       <button class="tab active" data-tab="insitu">In-situ</button>
       <button class="tab" data-tab="uav">UAVs</button>
       <button class="tab" data-tab="sat">Satellites</button>
@@ -1137,6 +1138,7 @@
            in the URL; the JS at page load stores a flag in localStorage so
            subsequent visits keep it visible. -->
       <button class="tab" data-tab="analytics" id="tabAnalytics" style="display:none;">Analytics</button>
+      <button class="tab" data-tab="about">About Data</button>
       <button class="tab tab-support" data-tab="support" title="Help us extend the cal/val site">♥ Support</button>
     </div>
     <div class="credit">
