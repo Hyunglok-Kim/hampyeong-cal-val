@@ -423,6 +423,17 @@ AI prediction · Visitor History · **About Data** · Support.
   chunks to stay under EE's memory limit). Refresh:
   `/usr/bin/python3 download_models.py --project nodal-skein-411619 --start <last>`
   then commit — the CSV writer merges by date, so incremental runs are safe.
+  Variables: surface SM, root-zone SM, soil temp, precip (radio). Not every
+  model has every variable — ERA5-Land has no root-zone column, GLDAS has
+  no precip; the UI notes these instead of drawing a flat-zero line (empty
+  CSV cells MUST be guarded — `+""`/`+null` are 0/finite; use `modelNum()`).
+  **Representativeness view** (educational): pick one station in the side
+  panel to overlay it (red dotted) plus the ±1σ inter-station spread band;
+  the skill card then adds each model's score against that single station
+  (`[vs HPxxxx]`) alongside the network-mean score, and the station's own
+  ubRMSE vs the network mean — the representativeness error, i.e. why one
+  point can't validate a coarse pixel. All of this is surface-SM only (the
+  only variable the in-situ network measures) and reuses `daily_sm.json`.
 - **AI prediction** — placeholder ("coming soon").
 
 ## Footer logos (in order)

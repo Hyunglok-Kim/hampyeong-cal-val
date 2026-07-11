@@ -1807,15 +1807,37 @@
         </div>
       </div>
 
+      <!-- Single-station representativeness: pick one station and compare it
+           to the whole-network mean + spread. Surface SM only (that's what
+           the in-situ network measures). -->
+      <div class="card" id="modelStationCard">
+        <h4 style="margin-top:0;">Single station vs network</h4>
+        <div class="lband-row">
+          <label>Station
+            <select id="modelStation" style="width:100%;margin-top:4px;"></select>
+          </label>
+          <label style="margin-top:6px;"><input type="checkbox" id="modelShowSpread" checked>
+            Show inter-station spread (±1σ)</label>
+        </div>
+        <div class="stats-hint">
+          Educational view: a coarse model pixel (9–25 km) should match the
+          <b>field average</b>, but any single sensor drifts from that
+          average — the shaded band shows how far. That gap is the
+          <b>representativeness error</b>, and it's why one point can't
+          validate a satellite pixel.
+        </div>
+      </div>
+
       <!-- Validation skill vs the in-situ network mean, computed client-side
            over the overlapping days. Only meaningful for surface SM. -->
       <div class="card" id="modelMetricsCard">
         <h4 style="margin-top:0;">Skill vs in-situ (surface SM)</h4>
         <div id="modelMetrics" style="font-size:12px;line-height:1.6;color:var(--panel-text);">—</div>
         <div class="stats-hint">
-          R = correlation, bias = model − in-situ mean, ubRMSE =
-          unbiased root-mean-square error. Computed over days where both
-          the model and the station network report.
+          R = correlation, bias = model − reference, ubRMSE = unbiased
+          root-mean-square error. <b>[vs station]</b> repeats each model's
+          skill scored against the single station instead of the network
+          mean — usually worse, showing the cost of single-point validation.
         </div>
       </div>
 
@@ -3726,15 +3748,29 @@ function ensureModelsLoaded() {
   });
 }
 
-// Daily network-mean surface SM from the precomputed overlay index.
-function insituDailyMeanSeries() {
-  if (!dailySM) return { x: [], y: [] };
-  const x = [], y = [];
+// Per-day in-situ surface-SM stats across the network (mean + ±1σ band),
+// from the precomputed overlay index.
+function insituDailyStats() {
+  const x = [], mean = [], lo = [], hi = [];
+  if (!dailySM) return { x, mean, lo, hi };
   for (const d of dailySM.dates) {
     const vals = Object.values(dailySM.byDate[d] || {}).filter(Number.isFinite);
     if (!vals.length) continue;
-    x.push(d);
-    y.push(vals.reduce((a, b) => a + b, 0) / vals.length);
+    const m = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const v = vals.reduce((a, b) => a + (b - m) ** 2, 0) / vals.length;
+    const s = Math.sqrt(v);
+    x.push(d); mean.push(m); lo.push(m - s); hi.push(m + s);
+  }
+  return { x, mean, lo, hi };
+}
+
+// One station's daily surface-SM series (same source as the network mean).
+function stationDailySeries(id) {
+  const x = [], y = [];
+  if (!dailySM || !id) return { x, y };
+  for (const d of dailySM.dates) {
+    const v = dailySM.byDate[d]?.[id];
+    if (Number.isFinite(v)) { x.push(d); y.push(v); }
   }
   return { x, y };
 }
@@ -3744,102 +3780,196 @@ function _modelChecked() {
     .filter(cb => cb.checked).map(cb => cb.dataset.model);
 }
 
+// Parse a model CSV cell to a finite number, or null for missing. Critical:
+// +"" and +null are 0 (finite), so a plain Number.isFinite would silently
+// treat a missing value as zero.
+function modelNum(v) {
+  if (v === "" || v == null) return null;
+  const n = +v;
+  return Number.isFinite(n) ? n : null;
+}
+
+let _modelStationPopulated = false;
+function populateModelStationSelect() {
+  if (_modelStationPopulated) return;
+  const sel = document.getElementById("modelStation");
+  if (!sel || !stations.length) return;
+  const want = (currentStation && currentStation.station_id) || "HP1301";
+  sel.innerHTML = stations
+    .map(s => `<option value="${s.station_id}"${s.station_id === want ? " selected" : ""}>${s.station_id} — ${s.land_cover || ""}</option>`)
+    .join("");
+  _modelStationPopulated = true;
+}
+
 function renderModelChart() {
   if (!_modelData) return;
+  populateModelStationSelect();
   const varName = document.querySelector('input[name="modelVar"]:checked').value;
   const info    = MODEL_VAR_INFO[varName];
-  const traces  = [];
+  const isSM    = (varName === "sm_surface");
+  const band = [];   // drawn first → sits behind the lines
+  const lines = [];
+  const missing = [];
 
-  for (const m of _modelChecked()) {
-    const rows = (_modelData[m] || []).filter(r => Number.isFinite(+r[varName]));
-    if (!rows.length) continue;
-    traces.push({
-      x: rows.map(r => r.date),
-      y: rows.map(r => +r[varName]),
-      name: MODEL_META[m].label,
-      type: info.kind === "bar" ? "bar" : "scatter",
-      mode: "lines",
-      line: { color: MODEL_META[m].color, width: 1.8 },
-      marker: { color: MODEL_META[m].color },
-      connectgaps: false,
-    });
-  }
-
-  // Ground truth — only comparable for surface SM (the network mean is
-  // built from the near-surface sensors).
+  // In-situ reference (surface SM only) — spread band + network mean.
   const showInsitu = document.getElementById("modelShowInsitu").checked;
-  if (showInsitu && varName === "sm_surface") {
-    const ins = insituDailyMeanSeries();
-    if (ins.x.length) {
-      traces.push({
-        x: ins.x, y: ins.y,
-        name: "In-situ mean (47 st.)",
-        type: "scatter", mode: "lines",
-        line: { color: "#111827", width: 2.4 },
+  const showSpread = document.getElementById("modelShowSpread").checked;
+  let stats = null;
+  if (isSM && showInsitu) {
+    stats = insituDailyStats();
+    if (stats.x.length && showSpread) {
+      band.push({
+        x: stats.x, y: stats.hi, mode: "lines", line: { width: 0 },
+        hoverinfo: "skip", showlegend: false, name: "+1σ",
+      });
+      band.push({
+        x: stats.x, y: stats.lo, mode: "lines", line: { width: 0 },
+        fill: "tonexty", fillcolor: "rgba(100,100,100,0.16)",
+        hoverinfo: "skip", name: "Inter-station ±1σ",
+      });
+    }
+    if (stats.x.length) {
+      lines.push({
+        x: stats.x, y: stats.mean, name: "In-situ mean (network)",
+        mode: "lines", line: { color: "#111827", width: 2.6 },
         connectgaps: false,
       });
     }
   }
 
+  // The chosen single station (surface SM only).
+  const stationId = document.getElementById("modelStation")?.value;
+  if (isSM && stationId) {
+    const st = stationDailySeries(stationId);
+    if (st.x.length) {
+      lines.push({
+        x: st.x, y: st.y, name: `${stationId} (single station)`,
+        mode: "lines", line: { color: "#dc2626", width: 1.5, dash: "dot" },
+        connectgaps: false,
+      });
+    }
+  }
+
+  // Model series (all variables). Models without the variable are noted.
+  // Guard empty/null explicitly — +"" and +null coerce to 0 (finite), which
+  // would otherwise draw a bogus flat-zero line (e.g. GLDAS has no precip,
+  // ERA5-Land has no root-zone column).
+  for (const m of _modelChecked()) {
+    const rows = (_modelData[m] || []).filter(r => modelNum(r[varName]) !== null);
+    if (!rows.length) { missing.push(MODEL_META[m].label); continue; }
+    lines.push({
+      x: rows.map(r => r.date),
+      y: rows.map(r => +r[varName]),
+      name: MODEL_META[m].label,
+      mode: "lines",
+      line: { color: MODEL_META[m].color, width: 1.8 },
+      connectgaps: false,
+    });
+  }
+
   const el = document.getElementById("modelChart");
+  const traces = [...band, ...lines];
   if (!traces.length) {
     Plotly.purge(el);
-    el.innerHTML = `<div class="chart-msg">No model selected (or no data for this variable).</div>`;
+    const why = missing.length
+      ? `No ${info.title.toLowerCase()} data for the selected model(s): ${missing.join(", ")}.`
+      : "Select at least one model.";
+    el.innerHTML = `<div class="chart-msg">${why}</div>`;
     renderModelMetrics();
     return;
   }
   el.innerHTML = "";
+  const note = missing.length
+    ? `  ·  no ${info.title.toLowerCase()} in ${missing.join(", ")}`
+    : "";
+  document.getElementById("modelChartSubtitle").innerHTML =
+    `Daily <b>${info.title.toLowerCase()}</b> at the site pixel` +
+    (isSM ? ", vs the 47-station network mean and one chosen station" : "") +
+    note + ".";
   Plotly.react(el, traces, {
     margin: { l: 55, r: 15, t: 10, b: 40 },
     xaxis: { type: "date" },
     yaxis: { title: { text: `${info.title} (${info.unit})` } },
     legend: { orientation: "h", y: -0.15 },
     hovermode: "x unified",
-    barmode: "group",
   }, { responsive: true, displaylogo: false });
   renderModelMetrics();
 }
 
-// Pearson R, bias, ubRMSE of each model's surface SM against the in-situ
-// network mean, over the days both report.
+// {n, r, bias, ubrmse} of paired [model, reference] values.
+function _pairStats(pairs) {
+  const n = pairs.length;
+  if (n < 10) return null;
+  const mx = pairs.reduce((a, p) => a + p[0], 0) / n;
+  const my = pairs.reduce((a, p) => a + p[1], 0) / n;
+  let sxy = 0, sxx = 0, syy = 0, se2 = 0;
+  for (const [x, y] of pairs) {
+    sxy += (x - mx) * (y - my);
+    sxx += (x - mx) ** 2;
+    syy += (y - my) ** 2;
+    se2 += ((x - mx) - (y - my)) ** 2;
+  }
+  return {
+    n,
+    r: sxy / Math.sqrt(sxx * syy || 1e-12),
+    bias: mx - my,
+    ubrmse: Math.sqrt(se2 / n),
+  };
+}
+
+// Surface-SM skill of each model against (a) the network mean and (b) the
+// single chosen station, plus the station's own representativeness error.
 function renderModelMetrics() {
   const out = document.getElementById("modelMetrics");
   if (!out || !_modelData) return;
-  const ins = insituDailyMeanSeries();
-  const insByDate = new Map(ins.x.map((d, i) => [d, ins.y[i]]));
+
+  const stats = insituDailyStats();
+  const meanByDate = new Map(stats.x.map((d, i) => [d, stats.mean[i]]));
+  const stationId  = document.getElementById("modelStation")?.value;
+  const st = stationId ? stationDailySeries(stationId) : { x: [], y: [] };
+  const stnByDate = new Map(st.x.map((d, i) => [d, st.y[i]]));
+
   const lines = [];
   for (const m of _modelChecked()) {
-    const pairs = (_modelData[m] || [])
-      .filter(r => Number.isFinite(+r.sm_surface) && insByDate.has(r.date))
-      .map(r => [+r.sm_surface, insByDate.get(r.date)]);
-    if (pairs.length < 10) {
-      lines.push(`<b>${MODEL_META[m].label}</b>: not enough overlap`);
-      continue;
+    const rows = (_modelData[m] || []).filter(r => modelNum(r.sm_surface) !== null);
+    const vsMean = _pairStats(rows.filter(r => meanByDate.has(r.date))
+      .map(r => [+r.sm_surface, meanByDate.get(r.date)]));
+    if (!vsMean) { lines.push(`<b>${MODEL_META[m].label}</b>: not enough overlap`); continue; }
+    let s = `<b>${MODEL_META[m].label}</b> (n=${vsMean.n}): R ${vsMean.r.toFixed(2)}, ` +
+            `bias ${vsMean.bias >= 0 ? "+" : ""}${vsMean.bias.toFixed(3)}, ` +
+            `ubRMSE ${vsMean.ubrmse.toFixed(3)}`;
+    const vsStn = stationId ? _pairStats(rows.filter(r => stnByDate.has(r.date))
+      .map(r => [+r.sm_surface, stnByDate.get(r.date)])) : null;
+    if (vsStn) {
+      s += `<br><span style="color:var(--muted);">&nbsp;&nbsp;[vs ${stationId}: ` +
+           `R ${vsStn.r.toFixed(2)}, ubRMSE ${vsStn.ubrmse.toFixed(3)}]</span>`;
     }
-    const n  = pairs.length;
-    const mx = pairs.reduce((a, p) => a + p[0], 0) / n;
-    const my = pairs.reduce((a, p) => a + p[1], 0) / n;
-    let sxy = 0, sxx = 0, syy = 0, se2 = 0;
-    for (const [x, y] of pairs) {
-      sxy += (x - mx) * (y - my);
-      sxx += (x - mx) ** 2;
-      syy += (y - my) ** 2;
-      se2 += ((x - mx) - (y - my)) ** 2;
+    lines.push(s);
+  }
+
+  // Representativeness error of the chosen station vs the network mean.
+  if (stationId) {
+    const rep = _pairStats(st.x
+      .filter(d => meanByDate.has(d))
+      .map(d => [stnByDate.get(d), meanByDate.get(d)]));
+    if (rep) {
+      lines.push(
+        `<div style="margin-top:6px;border-top:1px solid var(--border-dark);padding-top:6px;">` +
+        `<b>Representativeness</b> — ${stationId} vs network mean (n=${rep.n}):<br>` +
+        `ubRMSE ${rep.ubrmse.toFixed(3)}, bias ${rep.bias >= 0 ? "+" : ""}${rep.bias.toFixed(3)}, ` +
+        `R ${rep.r.toFixed(2)} m³/m³<br>` +
+        `<span style="color:var(--muted);">One sensor differs from the field ` +
+        `average by ~${rep.ubrmse.toFixed(3)} m³/m³ — before any model enters.</span></div>`);
     }
-    const r      = sxy / Math.sqrt(sxx * syy || 1e-12);
-    const bias   = mx - my;
-    const ubrmse = Math.sqrt(se2 / n);
-    lines.push(
-      `<b>${MODEL_META[m].label}</b> (n=${n}): R ${r.toFixed(2)}, ` +
-      `bias ${bias >= 0 ? "+" : ""}${bias.toFixed(3)}, ubRMSE ${ubrmse.toFixed(3)} m³/m³`);
   }
   out.innerHTML = lines.length ? lines.join("<br>") : "—";
 }
 
-// Model tab controls → re-render
-document.querySelectorAll('#modelToggles input, input[name="modelVar"]').forEach(el => {
-  el.addEventListener("change", renderModelChart);
-});
+// Model tab controls → re-render (checkboxes, variable radio, station select,
+// spread toggle).
+document.querySelectorAll(
+  '#modelToggles input, input[name="modelVar"], #modelStation, #modelShowSpread'
+).forEach(el => el.addEventListener("change", renderModelChart));
 
 // =============================================================
 // Pictures tab — folder navigation + gallery + lightbox
