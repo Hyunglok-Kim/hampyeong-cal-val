@@ -1052,6 +1052,26 @@
     .tab { padding: 7px 12px; font-size: 12px; }
     #map { height: 300px; }
   }
+/* About Data tab — readable article column */
+.about-article {
+  max-width: 820px;
+  padding: 6px 10px 24px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--panel-text, #333);
+}
+.about-article h2 { font-size: 21px; margin: 8px 0 4px; }
+.about-article h3 { font-size: 16px; margin: 22px 0 6px; border-bottom: 1px solid var(--border, #ddd); padding-bottom: 4px; }
+.about-article p  { margin: 8px 0; }
+.about-article ul { margin: 6px 0 10px 22px; }
+.about-article li { margin: 3px 0; }
+.about-lead { font-size: 15px; }
+.about-foot { margin-top: 20px; font-size: 13px; color: #6b6257; border-top: 1px solid var(--border, #ddd); padding-top: 12px; }
+.about-table-wrap { overflow-x: auto; margin: 8px 0 12px; }
+.about-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.about-table th, .about-table td { border: 1px solid var(--border, #ddd); padding: 6px 9px; text-align: left; vertical-align: top; }
+.about-table th { background: rgba(31,111,204,.08); }
+
 /* Boot overlay — painted with the first HTML bytes, dismissed by
    dismissBootOverlay() once stations are on the map (or by its own
    15 s safety timer if anything upstream fails). */
@@ -1106,6 +1126,7 @@
   <!-- TOP BAR: tabs on the left, credit on the right -->
   <div class="top-bar">
     <div class="tabs" id="tabs">
+      <button class="tab" data-tab="about">About Data</button>
       <button class="tab active" data-tab="insitu">In-situ</button>
       <button class="tab" data-tab="uav">UAVs</button>
       <button class="tab" data-tab="sat">Satellites</button>
@@ -1137,6 +1158,132 @@
       <div id="picGallery" class="pic-gallery">
         <div class="pic-gallery-empty">No folder selected.</div>
       </div>
+    </div>
+
+    <!-- About Data — full-width article column shown when the "About Data"
+         tab is active (replaces the map column, like the Pictures tab). -->
+    <div class="map-col" id="aboutMainCol" style="display:none;">
+      <article class="about-article">
+        <h2>What data does this site collect?</h2>
+        <p class="about-lead">
+          This is the data portal of the <b>NASA–GIST Core Validation Site
+          (CVS)</b> at Hampyeong, South Korea — a heavily instrumented
+          1&nbsp;km × 1&nbsp;km cell used to check ("validate") the soil-moisture
+          maps produced by satellites such as <b>NASA SMAP</b> and
+          <b>NASA-ISRO NISAR</b>. To do that, we measure the same field in
+          four independent ways — from the ground, from drones, from
+          satellites, and with reference base maps — and put them all on one
+          interactive map so they can be compared date by date.
+        </p>
+
+        <h3>1. The site</h3>
+        <p>
+          The core cell is a real <b>EASE-Grid 2.0</b> 1-km cell
+          (center 35.0151°N, 126.5508°E), nested inside the matching 3 km,
+          9 km and 36 km satellite grid cells — you can see all four drawn
+          on the map in the In-situ tab. Within this one square kilometre
+          the site spans six land-cover types: <b>rice paddy, upland field,
+          deciduous / coniferous / mixed forest, and grassland</b>, so one
+          cell exercises a satellite algorithm across very different
+          surfaces.
+        </p>
+
+        <h3>2. In-situ sensor network — the ground truth</h3>
+        <p>
+          <b>47 stations, 82 soil sensors</b> (METER TEROS-12), logging
+          <b>soil moisture and soil temperature every 5 minutes</b>,
+          continuously since June 2025. Sensor placement follows the land
+          cover:
+        </p>
+        <ul>
+          <li><b>Rice paddy</b> — one sensor in the irrigated zone (10 cm
+            depth) and one in the paddy bank (20 cm)</li>
+          <li><b>Upland field / grassland</b> — one sensor at 10 cm</li>
+          <li><b>Forest</b> — one sensor in the tree-root zone (10 cm) plus
+            one on the tree trunk (~1 m above ground, measuring stem
+            moisture)</li>
+        </ul>
+        <p>
+          Data are quality-flagged and distributed in the
+          <b>ISMN (International Soil Moisture Network) standard format</b>.
+          The charts on this site use hourly means; the full 5-minute
+          records are available on request. Stations whose newest reading
+          is less than 30 days old pulse with a red ring on the map.
+        </p>
+
+        <h3>3. UAV (drone) campaigns</h3>
+        <p>
+          Roughly every 1–2 weeks in season we fly the full cell and
+          deliver everything at <b>1 m resolution</b>:
+        </p>
+        <ul>
+          <li><b>Multispectral camera</b> — blue / green / red / near-infrared
+            bands plus a thermal (LWIR) channel, from which we produce
+            true-color <b>RGB</b>, vegetation index <b>NDVI</b>, water index
+            <b>NDWI</b>, and surface-temperature <b>TIR</b> maps</li>
+          <li><b>LiDAR</b> — a digital surface model (DSM) of terrain and
+            canopy height</li>
+          <li><b>PolRA L-band radiometer</b> — the same measurement principle
+            as SMAP, flown at drone altitude: V/H-pol brightness temperature
+            and a retrieved soil-moisture map</li>
+        </ul>
+
+        <h3>4. Satellites</h3>
+        <p>
+          For every family of satellite data we archive scenes clipped to
+          the site, so ground / drone / satellite views can be flipped
+          through on the same dates:
+        </p>
+        <div class="about-table-wrap">
+          <table class="about-table">
+            <thead>
+              <tr><th>Product</th><th>What it shows</th><th>Resolution</th><th>Revisit</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><b>HLS NDVI</b> (Landsat 8/9 + Sentinel-2)</td><td>vegetation greenness</td><td>30 m</td><td>2–3 days</td></tr>
+              <tr><td><b>Landsat 8/9 LST</b></td><td>land-surface temperature</td><td>30 m</td><td>~8 days</td></tr>
+              <tr><td><b>MODIS NDVI</b></td><td>vegetation greenness</td><td>500 m</td><td>16-day composite</td></tr>
+              <tr><td><b>MODIS LST</b></td><td>land-surface temperature</td><td>1 km</td><td>8-day composite</td></tr>
+              <tr><td><b>Sentinel-1 VV / VH</b></td><td>C-band radar backscatter — sensitive to soil moisture (VV) and vegetation (VH)</td><td>10 m</td><td>~6 days</td></tr>
+              <tr><td><b>NISAR</b> (beta)</td><td>L-band radar: soil-moisture retrievals, HH/HV backscatter, incidence angle</td><td>200 m</td><td>site is a validation node</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>5. Reference base maps</h3>
+        <p>
+          Static layers used to interpret everything else: a <b>5-m land-use /
+          land-cover map</b>, a <b>0.5-m DEM</b> of the site, and a <b>30-m
+          regional DEM</b>.
+        </p>
+
+        <h3>6. How the data flows</h3>
+        <p>
+          Field loggers → lab NAS at GIST → standardization scripts
+          (ISMN formatting, quality flags, resampling to the site grid) →
+          this portal. The site is fully static — every layer you see is a
+          pre-rendered, georeferenced image, which keeps it fast and
+          archivable. Updates land roughly weekly.
+        </p>
+
+        <h3>7. Getting the data</h3>
+        <p>
+          Browsing is free and unrestricted. Downloadable files
+          (station CSVs, raw NetCDF/GeoTIFF) are provided <b>by email
+          request</b> — this lets us track usage, support users properly,
+          and report impact to the funding agencies. Use the request
+          buttons in the In-situ tab, or write to
+          <a href="mailto:hyunglokkim@gmail.com">hyunglokkim@gmail.com</a>
+          with your name, affiliation, intended use, variables and time
+          range.
+        </p>
+
+        <p class="about-foot">
+          Operated by the <b>HydroAI Lab, GIST</b> in partnership with
+          NASA JPL and NASA GSFC. If you use these data in a publication,
+          please contact us for the correct citation.
+        </p>
+      </article>
     </div>
     <div class="map-col" id="mapCol">
       <div id="map"></div>
@@ -1219,6 +1366,51 @@
           </label>
         </div>
         <div class="colorbars" id="colorbars"></div>
+      </div>
+    </div>
+
+    <!-- About Data side panel — live "at a glance" numbers, filled by
+         renderAboutStats() from the already-loaded catalogs. -->
+    <div class="side" id="side-about" style="display:none;">
+      <div class="station-id">Data at a glance</div>
+      <div class="card">
+        <h4 style="margin-top:0;">Current holdings</h4>
+        <div class="stats-grid">
+          <div class="stats-cell">
+            <div class="stats-label">Stations</div>
+            <div class="stats-value" id="aboutStations">—</div>
+          </div>
+          <div class="stats-cell">
+            <div class="stats-label">Soil sensors</div>
+            <div class="stats-value" id="aboutSensors">—</div>
+          </div>
+          <div class="stats-cell">
+            <div class="stats-label">UAV flights</div>
+            <div class="stats-value" id="aboutFlights">—</div>
+          </div>
+          <div class="stats-cell">
+            <div class="stats-label">Satellite scenes</div>
+            <div class="stats-value" id="aboutScenes">—</div>
+          </div>
+        </div>
+        <div class="stats-hint" id="aboutFreshness">—</div>
+      </div>
+      <div class="card">
+        <h4 style="margin-top:0;">Measured variables</h4>
+        <div style="font-size:12.5px; line-height:1.7; color:var(--panel-text);">
+          <b>Ground:</b> soil moisture, soil temperature<br>
+          <b>UAV:</b> RGB, NDVI, NDWI, thermal, LiDAR DSM, L-band TB &amp; SM<br>
+          <b>Satellite:</b> NDVI, LST, C-band &amp; L-band backscatter, SM retrievals<br>
+          <b>Static:</b> land cover (5 m), DEM (0.5 m / 30 m)
+        </div>
+      </div>
+      <div class="card">
+        <h4 style="margin-top:0;">Contact</h4>
+        <div style="font-size:12.5px; line-height:1.7; color:var(--panel-text);">
+          HydroAI Lab, GIST<br>
+          PI: Hyunglok Kim<br>
+          <a href="mailto:hyunglokkim@gmail.com">hyunglokkim@gmail.com</a>
+        </div>
       </div>
     </div>
 
@@ -3229,18 +3421,23 @@ document.querySelectorAll(".tab").forEach(btn => {
     document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     const t = btn.dataset.tab;
-    ["insitu","uav","sat","model","ai","pic","analytics","support"].forEach(name => {
+    ["about","insitu","uav","sat","model","ai","pic","analytics","support"].forEach(name => {
       const sp = document.getElementById(`side-${name}`);
       if (sp) sp.style.display = (name === t) ? "" : "none";
     });
-    // Pictures tab swaps the leaflet map column for a gallery column;
-    // every other tab keeps the map visible.
-    const showPic = (t === "pic");
-    document.getElementById("mapCol").style.display    = showPic ? "none" : "";
-    document.getElementById("picMainCol").style.display = showPic ? "" : "none";
+    // Pictures and About Data swap the leaflet map column for their own
+    // main column; every other tab keeps the map visible.
+    const showPic   = (t === "pic");
+    const showAbout = (t === "about");
+    document.getElementById("mapCol").style.display      = (showPic || showAbout) ? "none" : "";
+    document.getElementById("picMainCol").style.display   = showPic   ? "" : "none";
+    document.getElementById("aboutMainCol").style.display = showAbout ? "" : "none";
 
-    if (!showPic) {
+    if (!showPic && !showAbout) {
       map.invalidateSize();                            // map div size may have changed
+    }
+    if (t === "about") {
+      renderAboutStats();                              // refresh live counts
     }
     if (t === "uav") {
       ensureLbandLoaded();                             // lazy-load catalog on first visit
@@ -3255,6 +3452,32 @@ document.querySelectorAll(".tab").forEach(btn => {
     // across tabs unless the user explicitly removes them in the UAVs tab.
   });
 });
+
+// =============================================================
+// About Data tab — live "at a glance" numbers from loaded catalogs.
+// Called on every tab open (cheap; everything is already in memory).
+// =============================================================
+function renderAboutStats() {
+  const put = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  if (stations.length) {
+    put("aboutStations", stations.length);
+    put("aboutSensors", stations.reduce((a, s) => a + _stationSensorCount(s), 0));
+  }
+  if (uavCatalog && uavCatalog.length) {
+    put("aboutFlights", new Set(uavCatalog.map(r => r.date)).size);
+  }
+  if (satCatalog && satCatalog.length) {
+    put("aboutScenes", satCatalog.length);
+  }
+  const parts = [];
+  if (dailySM && dailySM.dates.length)
+    parts.push(`newest ground reading ${dailySM.dates[dailySM.dates.length - 1]}`);
+  if (uavCatalog && uavCatalog.length)
+    parts.push(`latest UAV flight ${uavCatalog.map(r => r.date).sort().pop()}`);
+  if (satCatalog && satCatalog.length)
+    parts.push(`latest satellite scene ${satCatalog.map(r => r.date).sort().pop()}`);
+  if (parts.length) put("aboutFreshness", parts.join(" · "));
+}
 
 // =============================================================
 // Pictures tab — folder navigation + gallery + lightbox

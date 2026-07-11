@@ -400,10 +400,20 @@ render as a crisp grid. The "interpolate" checkbox toggles this class off.
 
 ## Tabs
 
-5 tabs: **In-situ** (fully implemented), UAVs / Satellites / Models /
-AI prediction (currently placeholders that say "coming soon"). The In-situ tab
-already houses ALL overlays (UAV, satellite, NISAR, basemaps), so the other
-tabs are for richer per-source views to be designed later.
+Tab bar order: **About Data** · In-situ (default active) · UAVs · Satellites ·
+Models · AI prediction · Visitor History · Support.
+
+- **About Data** — first-time-visitor explainer of everything the site
+  collects (site geometry, in-situ network, UAV payloads, satellite product
+  table, basemaps, data-flow, access policy). Swaps the map column for a
+  full-width article (`#aboutMainCol`, same pattern as Pictures); its side
+  panel (`#side-about`) shows live counts filled by `renderAboutStats()`
+  from the already-loaded catalogs — update the article text when a new
+  data family is added.
+- **In-situ** — fully implemented; houses ALL overlays (UAV, satellite,
+  NISAR, basemaps).
+- **Models / AI prediction** — placeholders ("coming soon"); richer
+  per-source views to be designed later.
 
 ## Footer logos (in order)
 
