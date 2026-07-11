@@ -412,8 +412,18 @@ AI prediction · Visitor History · **About Data** · Support.
   data family is added.
 - **In-situ** — fully implemented; houses ALL overlays (UAV, satellite,
   NISAR, basemaps).
-- **Models / AI prediction** — placeholders ("coming soon"); richer
-  per-source views to be designed later.
+- **Models** — land-surface-model comparison. Models are 9–25 km/pixel
+  (whole site = one pixel) so there is NO map overlay: the tab swaps the
+  map column for a Plotly chart (`#modelMainCol`) plotting daily model
+  series against the in-situ network mean, with client-side skill metrics
+  (R / bias / ubRMSE) in the side panel. Data = tiny per-model CSVs in
+  `data/models/` written by `download_models.py` (SMAP L4 9 km ~4-day lag,
+  ERA5-Land 9 km ~1-week lag, GLDAS-2.2 25 km months lag — all via EE
+  `getRegion` point extraction at the site center; SMAP pulled in 60-day
+  chunks to stay under EE's memory limit). Refresh:
+  `/usr/bin/python3 download_models.py --project nodal-skein-411619 --start <last>`
+  then commit — the CSV writer merges by date, so incremental runs are safe.
+- **AI prediction** — placeholder ("coming soon").
 
 ## Footer logos (in order)
 

@@ -1287,6 +1287,19 @@
         </p>
       </article>
     </div>
+
+    <!-- Models — full-width comparison chart column (map hidden while
+         active; model pixels are far larger than the whole map view). -->
+    <div class="map-col" id="modelMainCol" style="display:none;">
+      <div class="pic-gallery-header">
+        <h3 style="margin:0;">Model vs in-situ comparison</h3>
+        <div class="pic-gallery-subtitle" id="modelChartSubtitle">
+          Daily land-surface-model values at the site pixel, against the
+          47-station network mean.
+        </div>
+      </div>
+      <div id="modelChart" style="width:100%;height:520px;"></div>
+    </div>
     <div class="map-col" id="mapCol">
       <div id="map"></div>
 
@@ -1764,8 +1777,57 @@
         </div>
       </div>
     </div>
+    <!-- Models side panel — land-surface models are 9-25 km resolution, so
+         the whole 1-km cell is a single model pixel: no map overlay, the
+         main column shows a comparison chart instead. -->
     <div class="side" id="side-model" style="display:none;">
-      <div class="card"><h4>Models</h4><div>Model output viewer coming soon.</div></div>
+      <div class="station-id">Land-surface models</div>
+
+      <div class="card">
+        <h4 style="margin-top:0;">Models</h4>
+        <div class="lband-row" id="modelToggles">
+          <label><input type="checkbox" data-model="SMAP_L4" checked>
+            SMAP L4 <span style="color:var(--muted);font-size:11px;">9 km · 3-hourly · ~4-day lag</span></label>
+          <label><input type="checkbox" data-model="ERA5_LAND" checked>
+            ERA5-Land <span style="color:var(--muted);font-size:11px;">9 km · daily · ~1-week lag</span></label>
+          <label><input type="checkbox" data-model="GLDAS22">
+            GLDAS-2.2 <span style="color:var(--muted);font-size:11px;">25 km · daily · months lag</span></label>
+          <label><input type="checkbox" id="modelShowInsitu" checked>
+            <b>In-situ network mean</b> <span style="color:var(--muted);font-size:11px;">47 stations · reference</span></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h4 style="margin-top:0;">Variable</h4>
+        <div class="lband-row">
+          <label><input type="radio" name="modelVar" value="sm_surface" checked> Surface soil moisture (m³/m³)</label>
+          <label><input type="radio" name="modelVar" value="sm_rootzone"> Root-zone soil moisture (m³/m³)</label>
+          <label><input type="radio" name="modelVar" value="soil_temp_c"> Soil temperature (°C)</label>
+          <label><input type="radio" name="modelVar" value="precip_mm"> Precipitation (mm/day)</label>
+        </div>
+      </div>
+
+      <!-- Validation skill vs the in-situ network mean, computed client-side
+           over the overlapping days. Only meaningful for surface SM. -->
+      <div class="card" id="modelMetricsCard">
+        <h4 style="margin-top:0;">Skill vs in-situ (surface SM)</h4>
+        <div id="modelMetrics" style="font-size:12px;line-height:1.6;color:var(--panel-text);">—</div>
+        <div class="stats-hint">
+          R = correlation, bias = model − in-situ mean, ubRMSE =
+          unbiased root-mean-square error. Computed over days where both
+          the model and the station network report.
+        </div>
+      </div>
+
+      <div class="card">
+        <h4 style="margin-top:0;">Why no map?</h4>
+        <div style="font-size:12px;line-height:1.6;color:var(--panel-text);">
+          These models are 9–25 km per pixel — the entire 1-km site sits
+          inside <b>one</b> pixel, so a map overlay would be a single flat
+          color. We extract that pixel's value as a daily time series and
+          compare it against the ground truth instead.
+        </div>
+      </div>
     </div>
     <div class="side" id="side-ai" style="display:none;">
       <div class="card"><h4>AI prediction</h4><div>AI prediction viewer coming soon.</div></div>
@@ -3569,19 +3631,24 @@ document.querySelectorAll(".tab").forEach(btn => {
       const sp = document.getElementById(`side-${name}`);
       if (sp) sp.style.display = (name === t) ? "" : "none";
     });
-    // Pictures and About Data swap the leaflet map column for their own
-    // main column; every other tab keeps the map visible.
+    // Pictures, About Data and Models swap the leaflet map column for their
+    // own main column; every other tab keeps the map visible.
     const showPic   = (t === "pic");
     const showAbout = (t === "about");
-    document.getElementById("mapCol").style.display      = (showPic || showAbout) ? "none" : "";
+    const showModel = (t === "model");
+    document.getElementById("mapCol").style.display      = (showPic || showAbout || showModel) ? "none" : "";
     document.getElementById("picMainCol").style.display   = showPic   ? "" : "none";
     document.getElementById("aboutMainCol").style.display = showAbout ? "" : "none";
+    document.getElementById("modelMainCol").style.display = showModel ? "" : "none";
 
-    if (!showPic && !showAbout) {
+    if (!showPic && !showAbout && !showModel) {
       map.invalidateSize();                            // map div size may have changed
     }
     if (t === "about") {
       renderAboutStats();                              // refresh live counts
+    }
+    if (t === "model") {
+      ensureModelsLoaded();                            // lazy-fetch CSVs + render chart
     }
     if (t === "uav") {
       ensureLbandLoaded();                             // lazy-load catalog on first visit
@@ -3622,6 +3689,157 @@ function renderAboutStats() {
     parts.push(`latest satellite scene ${satCatalog.map(r => r.date).sort().pop()}`);
   if (parts.length) put("aboutFreshness", parts.join(" · "));
 }
+
+// =============================================================
+// Models tab — land-surface-model time series vs the in-situ network.
+// CSVs are tiny (one row per day, written by download_models.py); they're
+// lazy-fetched on first tab open and cached for the session.
+// =============================================================
+const MODEL_META = {
+  SMAP_L4:   { label: "SMAP L4",   color: "#1d4ed8" },
+  ERA5_LAND: { label: "ERA5-Land", color: "#b45309" },
+  GLDAS22:   { label: "GLDAS-2.2", color: "#7c3aed" },
+};
+const MODEL_VAR_INFO = {
+  sm_surface:  { title: "Surface soil moisture",   unit: "m³/m³", kind: "line" },
+  sm_rootzone: { title: "Root-zone soil moisture", unit: "m³/m³", kind: "line" },
+  soil_temp_c: { title: "Soil temperature",        unit: "°C",    kind: "line" },
+  precip_mm:   { title: "Precipitation",           unit: "mm/day", kind: "bar" },
+};
+let _modelData = null;      // { SMAP_L4: rows[], ... }
+let _modelsLoading = false;
+
+function ensureModelsLoaded() {
+  if (_modelData) { renderModelChart(); return; }
+  if (_modelsLoading) return;
+  _modelsLoading = true;
+  Promise.all(Object.keys(MODEL_META).map(m => new Promise(resolve => {
+    Papa.parse(`data/models/${m}.csv`, {
+      download: true, header: true, skipEmptyLines: true,
+      dynamicTyping: (h) => h !== "date",
+      complete: (r) => resolve([m, r.data.filter(x => x.date)]),
+      error:    ()  => resolve([m, []]),
+    });
+  }))).then(pairs => {
+    _modelData = Object.fromEntries(pairs);
+    renderModelChart();
+  });
+}
+
+// Daily network-mean surface SM from the precomputed overlay index.
+function insituDailyMeanSeries() {
+  if (!dailySM) return { x: [], y: [] };
+  const x = [], y = [];
+  for (const d of dailySM.dates) {
+    const vals = Object.values(dailySM.byDate[d] || {}).filter(Number.isFinite);
+    if (!vals.length) continue;
+    x.push(d);
+    y.push(vals.reduce((a, b) => a + b, 0) / vals.length);
+  }
+  return { x, y };
+}
+
+function _modelChecked() {
+  return [...document.querySelectorAll('#modelToggles input[data-model]')]
+    .filter(cb => cb.checked).map(cb => cb.dataset.model);
+}
+
+function renderModelChart() {
+  if (!_modelData) return;
+  const varName = document.querySelector('input[name="modelVar"]:checked').value;
+  const info    = MODEL_VAR_INFO[varName];
+  const traces  = [];
+
+  for (const m of _modelChecked()) {
+    const rows = (_modelData[m] || []).filter(r => Number.isFinite(+r[varName]));
+    if (!rows.length) continue;
+    traces.push({
+      x: rows.map(r => r.date),
+      y: rows.map(r => +r[varName]),
+      name: MODEL_META[m].label,
+      type: info.kind === "bar" ? "bar" : "scatter",
+      mode: "lines",
+      line: { color: MODEL_META[m].color, width: 1.8 },
+      marker: { color: MODEL_META[m].color },
+      connectgaps: false,
+    });
+  }
+
+  // Ground truth — only comparable for surface SM (the network mean is
+  // built from the near-surface sensors).
+  const showInsitu = document.getElementById("modelShowInsitu").checked;
+  if (showInsitu && varName === "sm_surface") {
+    const ins = insituDailyMeanSeries();
+    if (ins.x.length) {
+      traces.push({
+        x: ins.x, y: ins.y,
+        name: "In-situ mean (47 st.)",
+        type: "scatter", mode: "lines",
+        line: { color: "#111827", width: 2.4 },
+        connectgaps: false,
+      });
+    }
+  }
+
+  const el = document.getElementById("modelChart");
+  if (!traces.length) {
+    Plotly.purge(el);
+    el.innerHTML = `<div class="chart-msg">No model selected (or no data for this variable).</div>`;
+    renderModelMetrics();
+    return;
+  }
+  el.innerHTML = "";
+  Plotly.react(el, traces, {
+    margin: { l: 55, r: 15, t: 10, b: 40 },
+    xaxis: { type: "date" },
+    yaxis: { title: { text: `${info.title} (${info.unit})` } },
+    legend: { orientation: "h", y: -0.15 },
+    hovermode: "x unified",
+    barmode: "group",
+  }, { responsive: true, displaylogo: false });
+  renderModelMetrics();
+}
+
+// Pearson R, bias, ubRMSE of each model's surface SM against the in-situ
+// network mean, over the days both report.
+function renderModelMetrics() {
+  const out = document.getElementById("modelMetrics");
+  if (!out || !_modelData) return;
+  const ins = insituDailyMeanSeries();
+  const insByDate = new Map(ins.x.map((d, i) => [d, ins.y[i]]));
+  const lines = [];
+  for (const m of _modelChecked()) {
+    const pairs = (_modelData[m] || [])
+      .filter(r => Number.isFinite(+r.sm_surface) && insByDate.has(r.date))
+      .map(r => [+r.sm_surface, insByDate.get(r.date)]);
+    if (pairs.length < 10) {
+      lines.push(`<b>${MODEL_META[m].label}</b>: not enough overlap`);
+      continue;
+    }
+    const n  = pairs.length;
+    const mx = pairs.reduce((a, p) => a + p[0], 0) / n;
+    const my = pairs.reduce((a, p) => a + p[1], 0) / n;
+    let sxy = 0, sxx = 0, syy = 0, se2 = 0;
+    for (const [x, y] of pairs) {
+      sxy += (x - mx) * (y - my);
+      sxx += (x - mx) ** 2;
+      syy += (y - my) ** 2;
+      se2 += ((x - mx) - (y - my)) ** 2;
+    }
+    const r      = sxy / Math.sqrt(sxx * syy || 1e-12);
+    const bias   = mx - my;
+    const ubrmse = Math.sqrt(se2 / n);
+    lines.push(
+      `<b>${MODEL_META[m].label}</b> (n=${n}): R ${r.toFixed(2)}, ` +
+      `bias ${bias >= 0 ? "+" : ""}${bias.toFixed(3)}, ubRMSE ${ubrmse.toFixed(3)} m³/m³`);
+  }
+  out.innerHTML = lines.length ? lines.join("<br>") : "—";
+}
+
+// Model tab controls → re-render
+document.querySelectorAll('#modelToggles input, input[name="modelVar"]').forEach(el => {
+  el.addEventListener("change", renderModelChart);
+});
 
 // =============================================================
 // Pictures tab — folder navigation + gallery + lightbox
