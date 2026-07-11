@@ -3900,10 +3900,11 @@ function renderModelChart() {
         x: rows.map(r => r.date), y: yy,
         name: `${MODEL_META[m].label} precip`,
         type: "bar", yaxis: "y2",
-        marker: { color: MODEL_META[m].color, opacity: 0.45 },
-        // label the model in the unified tooltip (<extra></extra> hides the
-        // default name box, so name it explicitly here)
-        hovertemplate: "%{fullData.name}: %{y:.1f} mm<extra></extra>",
+        marker: { color: MODEL_META[m].color, opacity: 0.4 },
+        // Bake the model name literally into the tooltip (<extra></extra>
+        // hides the default name box). Avoid %{fullData.*} tokens — some
+        // Plotly builds reject them and blank the whole chart.
+        hovertemplate: `${MODEL_META[m].label}: %{y:.1f} mm<extra></extra>`,
       });
     }
   }
@@ -3936,7 +3937,7 @@ function renderModelChart() {
     yaxis: { title: { text: `${info.title} (${info.unit})` } },
     legend: { orientation: "h", y: -0.15 },
     hovermode: "x unified",
-    barmode: "group",   // multiple models' precip bars sit side-by-side
+    barmode: "overlay",   // overlay is stable with bars on a secondary axis
   };
   if (precipTraces.length) {
     // Reversed hyetograph on the right: bars hang from the top, given 3×
