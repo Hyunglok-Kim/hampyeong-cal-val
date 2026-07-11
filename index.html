@@ -1052,16 +1052,19 @@
     .tab { padding: 7px 12px; font-size: 12px; }
     #map { height: 300px; }
   }
-/* Models tab — full-width chart on top, controls as a wrapping row below
-   (instead of the default chart-left / panel-right split). Toggled by the
-   `models-mode` class on the .layout container from the tab handler. */
+/* Models tab — a wide, short time-series chart on top; controls as an
+   aligned card grid below (not the chart-left / panel-right split).
+   Toggled by the `models-mode` class on the .layout container. */
 .layout.models-mode { grid-template-columns: 1fr; }
-#modelChart { height: 62vh; min-height: 420px; }
+#modelChart { height: 340px; }
 .layout.models-mode #side-model {
-  display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+  align-items: start;
 }
-.layout.models-mode #side-model > .station-id { flex-basis: 100%; margin: 0 0 2px; }
-.layout.models-mode #side-model > .card { flex: 1 1 260px; margin: 0; }
+.layout.models-mode #side-model > .station-id { grid-column: 1 / -1; margin: 0; }
+.layout.models-mode #side-model > .card { margin: 0; height: 100%; }
 
 /* About Data tab — readable article column */
 .about-article {
