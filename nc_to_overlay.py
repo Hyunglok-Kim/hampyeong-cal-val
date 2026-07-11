@@ -369,7 +369,34 @@ CATALOG_FIELDS = [
     "date", "time", "source", "product", "file",
     "n", "s", "e", "w",
     "resolution_m", "description",
+    # Per-scene data min/max — only filled for products that also emit a
+    # value-encoded "_data.png" (currently: tir). The browser uses these to
+    # colorize thermal scenes dynamically (single scene → its own range;
+    # multiple selected scenes → their combined range).
+    "dmin", "dmax",
 ]
+
+
+def write_data_png(values, png_path):
+    """Write an 8-bit value-encoded grayscale PNG: 0..255 maps linearly to
+    [dmin, dmax] of the scene's valid pixels; invalid pixels get alpha 0.
+    Returns (dmin, dmax), or None if the scene has no valid pixels."""
+    v = values
+    valid = np.isfinite(v)
+    if not valid.any():
+        return None
+    dmin = float(v[valid].min())
+    dmax = float(v[valid].max())
+    span = max(dmax - dmin, 1e-9)
+    g = np.zeros(v.shape, dtype=np.uint8)
+    g[valid] = np.clip(np.round((v[valid] - dmin) / span * 255), 0, 255).astype(np.uint8)
+    rgba = np.zeros((*v.shape, 4), dtype=np.uint8)
+    rgba[..., 0] = g
+    rgba[..., 1] = g
+    rgba[..., 2] = g
+    rgba[..., 3] = np.where(valid, 255, 0).astype(np.uint8)
+    Image.fromarray(rgba).save(png_path)
+    return dmin, dmax
 
 
 def main(arg=None):
@@ -409,6 +436,15 @@ def main(arg=None):
         png_name = f"{prefix}_{meta['product'].upper()}_{d_compact}_{suffix}.png"
         to_png(meta, out_dir / png_name)
 
+        # Thermal scenes also get a value-encoded companion so the browser
+        # can rescale colors to the viewed scenes' actual range.
+        extra = {}
+        if meta["product"] == "tir":
+            dr = write_data_png(meta["values"],
+                                out_dir / png_name.replace(".png", "_data.png"))
+            if dr:
+                extra = {"dmin": round(dr[0], 3), "dmax": round(dr[1], 3)}
+
         rows.append({
             "date": meta["date"], "time": meta["time"],
             "source": meta.get("source", ""),
@@ -417,6 +453,7 @@ def main(arg=None):
             "e": round(meta["e"], 6), "w": round(meta["w"], 6),
             "resolution_m": meta["resolution_m"],
             "description": meta["description"],
+            **extra,
         })
         print(f"  OK  {ncp.name}  →  {png_name}")
 
@@ -444,7 +481,9 @@ def main(arg=None):
 
     kept.sort(key=lambda r: (r["date"], r["time"], r["product"]))
     with catalog.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=CATALOG_FIELDS)
+        # restval="" — pre-existing rows read from an older catalog may lack
+        # newly-added fields (dmin/dmax); write them as empty.
+        w = csv.DictWriter(f, fieldnames=CATALOG_FIELDS, restval="")
         w.writeheader()
         w.writerows(kept)
     print(f"wrote {catalog}  ({len(kept)} entries; "

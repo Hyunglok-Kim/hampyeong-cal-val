@@ -2144,6 +2144,7 @@ let varState = [];          // [{name, cat, color, checked}, ...]
 let dailySM = null;         // { dates: [...], byDate: { '2025-06-01': {HP_1-1: 0.24, ...}, ... } }
 let uavCatalog = [];        // [{date, file, n,s,e,w, ...}]
 let uavLayer = null;        // current Leaflet imageOverlay
+let uavLayerRow = null;     // catalog row backing uavLayer (for dynamic TIR)
 
 // satellite (MODIS / HLS / Landsat) state — same schema as UAV catalog
 let satCatalog = [];
@@ -2550,6 +2551,120 @@ function setChartMessage(msg) {
 }
 
 // =============================================================
+// Dynamic thermal (TIR) rendering.
+// TIR PNGs are pre-baked with a fixed −15..50 °C scale, which crushes the
+// contrast of any single scene (a January flight may span just −10..1 °C).
+// nc_to_overlay.py also emits a value-encoded "_data.png" per TIR scene
+// (gray 0..255 → [dmin, dmax] from the catalog). Here we recolor those in
+// the browser so that:
+//   • one visible TIR scene  → scaled to that scene's own min/max
+//   • several visible scenes → scaled to their combined min/max, so the
+//     colors stay comparable across dates.
+// Falls back silently to the static PNG when the data PNG or dmin/dmax
+// are unavailable.
+// =============================================================
+const TIR_STOPS = [   // must match cmap_tir() in nc_to_overlay.py
+  [0.00,  15,  50, 130],
+  [0.20,  40, 130, 230],
+  [0.40, 120, 200, 200],
+  [0.55, 210, 230, 110],
+  [0.70, 255, 220,  60],
+  [0.85, 240, 130,  40],
+  [1.00, 200,  30,  30],
+];
+function tirColor(t) {
+  t = Math.max(0, Math.min(1, t));
+  for (let i = 0; i < TIR_STOPS.length - 1; i++) {
+    const [p0, r0, g0, b0] = TIR_STOPS[i];
+    const [p1, r1, g1, b1] = TIR_STOPS[i + 1];
+    if (t <= p1) {
+      const u = (t - p0) / Math.max(p1 - p0, 1e-9);
+      return [r0 + (r1 - r0) * u, g0 + (g1 - g0) * u, b0 + (b1 - b0) * u];
+    }
+  }
+  return [200, 30, 30];
+}
+
+const tirDataCache = new Map();   // url → {w, h, px:Uint8ClampedArray, vmin, vmax}
+let _tirDispRange  = null;        // {min, max} currently applied (drives legend)
+
+function tirHasData(row) {
+  // Explicit null/"" guard: +null and +"" coerce to 0, which would wrongly
+  // pass a Number.isFinite check for rows from an older catalog.
+  return row && row.product === "tir" &&
+         row.dmin !== "" && row.dmin != null &&
+         row.dmax !== "" && row.dmax != null &&
+         Number.isFinite(+row.dmin) && Number.isFinite(+row.dmax);
+}
+
+async function loadTirData(row) {
+  const url = `data/uav/${String(row.file).replace(/\.png$/, "_data.png")}`;
+  if (tirDataCache.has(url)) return tirDataCache.get(url);
+  const img = new Image();
+  img.src = url;
+  await img.decode();                       // throws on 404 → caller falls back
+  const c = document.createElement("canvas");
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0);
+  const px = ctx.getImageData(0, 0, c.width, c.height).data;
+  const entry = { w: c.width, h: c.height, px, vmin: +row.dmin, vmax: +row.dmax };
+  tirDataCache.set(url, entry);
+  return entry;
+}
+
+function colorizeTir(entry, dispMin, dispMax) {
+  const { w, h, px, vmin, vmax } = entry;
+  const span = Math.max(dispMax - dispMin, 1e-9);
+  const out = new ImageData(w, h);
+  const o = out.data;
+  for (let i = 0; i < w * h; i++) {
+    const a = px[i * 4 + 3];
+    if (!a) continue;                        // invalid pixel stays transparent
+    const v = vmin + (px[i * 4] / 255) * (vmax - vmin);
+    const [r, g, b] = tirColor((v - dispMin) / span);
+    o[i * 4] = r; o[i * 4 + 1] = g; o[i * 4 + 2] = b; o[i * 4 + 3] = 200;
+  }
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  c.getContext("2d").putImageData(out, 0, 0);
+  return c.toDataURL("image/png");
+}
+
+// Recolor every TIR layer currently on the map to the union range of all
+// visible TIR scenes. Async + token-guarded so a stale run can't clobber a
+// newer one.
+let _tirRefreshToken = 0;
+async function refreshTirLayers() {
+  const token = ++_tirRefreshToken;
+  // (row, layer) pairs for every TIR overlay on the map right now
+  const active = [];
+  if (uavLayer && tirHasData(uavLayerRow)) active.push([uavLayerRow, uavLayer]);
+  for (const [key, row] of uavSelections) {
+    const layer = uavLayers.get(key);
+    if (layer && tirHasData(row)) active.push([row, layer]);
+  }
+  if (!active.length) {
+    if (_tirDispRange) { _tirDispRange = null; renderColorbarsFromState(); }
+    return;
+  }
+  const dispMin = Math.min(...active.map(([r]) => +r.dmin));
+  const dispMax = Math.max(...active.map(([r]) => +r.dmax));
+  _tirDispRange = { min: dispMin, max: dispMax };
+  renderColorbarsFromState();
+  for (const [row, layer] of active) {
+    try {
+      const entry = await loadTirData(row);
+      if (token !== _tirRefreshToken) return;          // superseded
+      if (!map.hasLayer(layer)) continue;              // removed meanwhile
+      layer.setUrl(colorizeTir(entry, dispMin, dispMax));
+    } catch (e) {
+      console.warn(`[tir] data PNG unavailable for ${row.file} — static colors kept`, e);
+    }
+  }
+}
+
+// =============================================================
 // Overlay: applies the date + layer toggles to the map and chart
 // Called whenever the date picker or a layer checkbox changes.
 // =============================================================
@@ -2581,7 +2696,7 @@ function applyOverlay() {
   }
 
   // ---- UAV overlay --------------------------------------------------
-  if (uavLayer) { map.removeLayer(uavLayer); uavLayer = null; }
+  if (uavLayer) { map.removeLayer(uavLayer); uavLayer = null; uavLayerRow = null; }
   if (showUAV && uavCatalog.length && dateStr) {
     const product = document.getElementById("uavProduct").value;
     const candidates = uavCatalog.filter(r => r.product === product);
@@ -2593,6 +2708,7 @@ function applyOverlay() {
         uavLayer = L.imageOverlay(`data/uav/${m.file}`, bounds, {
           opacity: op, interactive: false, pane: "uavPane",
         }).addTo(map);
+        uavLayerRow = m;
         const time = m.time ? String(m.time).slice(0, 5) : "";
         const desc = m.description || product.toUpperCase();
         const tag  = (m.date !== dateStr) ? ", nearest" : "";
@@ -2668,11 +2784,29 @@ function applyOverlay() {
     nisarProduct: document.getElementById("nisarProduct").value,
   });
 
+  // ---- dynamic thermal rescale (async; updates layers + legend) -----
+  refreshTirLayers();
+
   // ---- vertical date marker on the timeseries chart -----------------
   drawDateMarker(dateStr);
 
   // ---- scene-availability strip (red dots under the chart) ----------
   renderSceneStrip();
+}
+
+// Rebuild the colorbars from the current control state — used by code that
+// changes what a legend should show without re-running all of applyOverlay
+// (e.g. the dynamic-TIR range update).
+function renderColorbarsFromState() {
+  renderColorbars({
+    showDots: document.getElementById("layerStations").checked,
+    showUAV:  document.getElementById("layerUAV").checked,
+    product:  document.getElementById("uavProduct").value,
+    showSat:  document.getElementById("layerSat").checked,
+    satProduct: document.getElementById("satProduct").value,
+    showNisar:  document.getElementById("layerNisar").checked,
+    nisarProduct: document.getElementById("nisarProduct").value,
+  });
 }
 
 function renderColorbars({ showDots, showUAV, product, showSat, satProduct, showNisar, nisarProduct }) {
@@ -2698,6 +2832,14 @@ function renderColorbars({ showDots, showUAV, product, showSat, satProduct, show
       div.className = "colorbar";
       div.innerHTML = `<span class="cb-prefix">UAV RGB</span><span class="cb-rgb-note">true-color composite (no scalar legend)</span>`;
       container.appendChild(div);
+    } else if (product === "tir" && _tirDispRange) {
+      // Dynamic thermal scale — legend shows the actual range of the
+      // scene(s) on the map, not the fixed −15..50 render range.
+      container.appendChild(make(
+        { ...COLORBARS.tir,
+          min: _tirDispRange.min.toFixed(1),
+          max: _tirDispRange.max.toFixed(1) },
+        `UAV ${COLORBARS.tir.label} (scene range)`));
     } else if (COLORBARS[product]) {
       container.appendChild(make(COLORBARS[product], `UAV ${COLORBARS[product].label}`));
     }
@@ -3609,6 +3751,7 @@ document.getElementById("uavClearSelections")?.addEventListener("click", () => {
   uavLayers.clear();
   uavSelections.clear();
   uavLastClickedKey = null;
+  refreshTirLayers();      // drop the dynamic-TIR legend range if no TIR remains
   // Legacy L-band (catalog.json patches) selection, if any, also clears.
   if (typeof lbandSelectedDates !== "undefined") {
     lbandSelectedDates.clear();
@@ -3808,6 +3951,10 @@ function selectUavFlight(dateStr, payload) {
     uavLayers.set(selKey, layer);
     uavLastClickedKey = selKey;
   }
+
+  // TIR selections share a common color scale — recompute the union range
+  // and recolor whenever the selection set changes (add OR remove).
+  refreshTirLayers();
 
   renderLbandCalendar();   // re-paint calendar + list selection highlights
 
