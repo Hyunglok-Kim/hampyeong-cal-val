@@ -1341,6 +1341,25 @@
         </div>
       </div>
       <div id="modelChart" style="width:100%;"></div>
+
+      <!-- Why-no-map explainer — placed here (full chart width) so the
+           animation reads clearly; the side panel is too narrow for it. -->
+      <figure style="margin:20px auto 6px;max-width:900px;">
+        <a href="assets/why-no-map.gif" target="_blank" rel="noopener"
+           title="Open full size" style="display:block;">
+          <img src="assets/why-no-map.gif"
+               alt="Animation: soil moisture varies over meters, but a 9–25 km model pixel swallows the whole 1-km site into a single flat value — so we plot that pixel's value over time instead of drawing a map."
+               style="width:100%;display:block;border:1px solid var(--border-dark);border-radius:10px;box-shadow:0 1px 6px rgba(15,23,42,0.12);"
+               loading="lazy">
+        </a>
+        <figcaption style="font-size:13px;line-height:1.65;color:var(--muted-on-light);margin:12px auto 0;max-width:780px;">
+          <b style="color:var(--text);">Why a chart and not a map?</b>
+          These land-surface models are 9–25 km per pixel — the entire 1-km
+          cal/val site sits inside <b>one</b> pixel, so a map overlay would be
+          a single flat color. We pull that pixel's value as a daily time
+          series (above) and compare it against the ground truth instead.
+        </figcaption>
+      </figure>
     </div>
     <div class="map-col" id="mapCol">
       <div id="map"></div>
@@ -1878,25 +1897,6 @@
         </div>
       </div>
 
-      <div class="card">
-        <h4 style="margin-top:0;">Why no map?</h4>
-        <a href="assets/why-no-map.gif" target="_blank" rel="noopener"
-           title="Open full size" style="display:block;margin:6px -16px 0;">
-          <img src="assets/why-no-map.gif"
-               alt="Animation: soil moisture varies over meters, but a 9–25 km model pixel swallows the whole 1-km site into a single flat value — so we plot that pixel's value over time instead of drawing a map."
-               style="width:100%;display:block;border-top:1px solid var(--border-dark);border-bottom:1px solid var(--border-dark);"
-               loading="lazy">
-        </a>
-        <div style="font-size:11px;color:var(--muted);margin:6px 0 8px;text-align:right;">
-          tap to enlarge
-        </div>
-        <div style="font-size:12px;line-height:1.6;color:var(--panel-text);">
-          These models are 9–25 km per pixel — the entire 1-km site sits
-          inside <b>one</b> pixel, so a map overlay would be a single flat
-          color. We extract that pixel's value as a daily time series and
-          compare it against the ground truth instead.
-        </div>
-      </div>
     </div>
     <div class="side" id="side-ai" style="display:none;">
       <div class="card"><h4>AI prediction</h4><div>AI prediction viewer coming soon.</div></div>

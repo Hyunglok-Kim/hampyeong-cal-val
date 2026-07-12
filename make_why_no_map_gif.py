@@ -143,7 +143,7 @@ for _ in range(12):                     # end hold
                "One pixel = one number → we plot it over time"))
 
 # --------------------------------------------------------------------------
-fig, ax = plt.subplots(figsize=(7.2, 4.8), dpi=100)
+fig, ax = plt.subplots(figsize=(7.2, 4.8), dpi=125)   # 900x600 — crisp when shown large
 fig.patch.set_facecolor(BG)
 # reserve headroom for the title (above axes) and the caption (below axes)
 fig.subplots_adjust(left=0.03, right=0.97, top=0.85, bottom=0.13)
