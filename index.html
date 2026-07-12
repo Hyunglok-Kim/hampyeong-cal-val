@@ -3935,7 +3935,12 @@ function _renderModelChartImpl() {
     renderModelMetrics();
     return;
   }
-  el.innerHTML = "";
+  // Do NOT blanket-clear the div: Plotly.react updates a LIVE chart in
+  // place, and wiping its DOM here (while Plotly's internal state survives)
+  // makes react reconcile against destroyed nodes → a silently blank chart
+  // with no error. This was the "chart vanishes on every interaction" bug.
+  // Only clear a plain-text placeholder so react starts from a clean div.
+  if (el.querySelector(".chart-msg")) el.innerHTML = "";
   const note = missing.length
     ? `  ·  no ${info.title.toLowerCase()} in ${missing.join(", ")}`
     : "";
