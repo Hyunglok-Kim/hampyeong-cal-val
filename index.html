@@ -1065,6 +1065,16 @@
 }
 .layout.models-mode #side-model > .station-id { grid-column: 1 / -1; margin: 0; }
 .layout.models-mode #side-model > .card { margin: 0; height: 100%; }
+/* Station multi-select chips (Models tab) */
+.model-chip-row { display: flex; flex-wrap: wrap; gap: 4px; max-height: 132px; overflow-y: auto; }
+.model-chip {
+  font-size: 11px; line-height: 1.2; padding: 3px 8px;
+  border: 1px solid var(--border-dark); border-radius: 11px;
+  background: transparent; color: var(--panel-text);
+  cursor: pointer; white-space: nowrap;
+}
+.model-chip:hover { border-color: var(--muted); }
+.model-chip.active { color: #fff; border-color: transparent; }
 
 /* About Data tab — readable article column */
 .about-article {
@@ -1812,35 +1822,31 @@
       </div>
 
       <div class="card">
-        <h4 style="margin-top:0;">Variable</h4>
+        <h4 style="margin-top:0;">Variables (overlay)</h4>
         <div class="lband-row">
-          <label><input type="radio" name="modelVar" value="sm_surface" checked> Surface soil moisture (m³/m³)</label>
-          <label><input type="radio" name="modelVar" value="sm_rootzone"> Root-zone soil moisture (m³/m³)</label>
-          <label><input type="radio" name="modelVar" value="soil_temp_c"> Soil temperature (°C)</label>
+          <label><input type="checkbox" name="modelVar" value="sm_surface" checked> Surface soil moisture <span style="color:var(--muted);font-size:11px;">m³/m³ · left</span></label>
+          <label><input type="checkbox" name="modelVar" value="sm_rootzone"> Root-zone soil moisture <span style="color:var(--muted);font-size:11px;">m³/m³ · left</span></label>
+          <label><input type="checkbox" name="modelVar" value="soil_temp_c"> Soil temperature <span style="color:var(--muted);font-size:11px;">°C · right</span></label>
           <label style="margin-top:6px;border-top:1px solid var(--border-dark);padding-top:6px;">
             <input type="checkbox" id="modelShowPrecip" checked>
-            Overlay precipitation (mm/day, bars)</label>
+            Precipitation <span style="color:var(--muted);font-size:11px;">mm/day · right · bars</span></label>
         </div>
       </div>
 
-      <!-- Single-station representativeness: pick one station and compare it
-           to the whole-network mean + spread. Surface SM only (that's what
-           the in-situ network measures). -->
+      <!-- Stations vs network: pick ANY number of stations (chips) to overlay
+           their surface-SM series against the network mean + spread. Surface
+           SM only (that's what the in-situ network measures). -->
       <div class="card" id="modelStationCard">
-        <h4 style="margin-top:0;">Single station vs network</h4>
-        <div class="lband-row">
-          <label>Station
-            <select id="modelStation" style="width:100%;margin-top:4px;"></select>
-          </label>
-          <label style="margin-top:6px;"><input type="checkbox" id="modelShowSpread" checked>
-            Show inter-station spread (±1σ)</label>
-        </div>
+        <h4 style="margin-top:0;">Stations vs network</h4>
+        <div id="modelStationChips" class="model-chip-row"></div>
+        <label style="margin-top:8px;display:block;"><input type="checkbox" id="modelShowSpread" checked>
+          Show inter-station spread (±1σ)</label>
         <div class="stats-hint">
-          Educational view: a coarse model pixel (9–25 km) should match the
-          <b>field average</b>, but any single sensor drifts from that
-          average — the shaded band shows how far. That gap is the
-          <b>representativeness error</b>, and it's why one point can't
-          validate a satellite pixel.
+          Click stations to overlay them (surface SM). A coarse model pixel
+          (9–25 km) should match the <b>field average</b>, but any single
+          sensor drifts from it — the shaded band shows how far. That gap is
+          the <b>representativeness error</b>: why one point can't validate a
+          satellite pixel.
         </div>
       </div>
 
@@ -3807,16 +3813,46 @@ function modelNum(v) {
   return Number.isFinite(n) ? n : null;
 }
 
-let _modelStationPopulated = false;
-function populateModelStationSelect() {
-  if (_modelStationPopulated) return;
-  const sel = document.getElementById("modelStation");
-  if (!sel || !stations.length) return;
-  const want = (currentStation && currentStation.station_id) || "HP1301";
-  sel.innerHTML = stations
-    .map(s => `<option value="${s.station_id}"${s.station_id === want ? " selected" : ""}>${s.station_id} — ${s.land_cover || ""}</option>`)
-    .join("");
-  _modelStationPopulated = true;
+// Multi-select station state for the Models tab. Any number of stations can
+// be overlaid; each gets a stable color by its index in `stations`.
+const modelStations = new Set();
+const STATION_PALETTE = ["#dc2626", "#ea580c", "#db2777", "#7c3aed",
+                         "#0891b2", "#65a30d", "#ca8a04", "#be123c"];
+function stationColor(id) {
+  const i = Math.max(0, stations.findIndex(s => s.station_id === id));
+  return STATION_PALETTE[i % STATION_PALETTE.length];
+}
+
+let _modelChipsPopulated = false;
+function populateModelStationChips() {
+  if (_modelChipsPopulated) return;
+  const box = document.getElementById("modelStationChips");
+  if (!box || !stations.length) return;
+  if (!modelStations.size) {
+    modelStations.add((currentStation && currentStation.station_id) || "HP1301");
+  }
+  box.innerHTML = "";
+  stations.forEach(s => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "model-chip";
+    b.textContent = s.station_id;
+    b.title = s.land_cover || "";
+    const sync = () => {
+      const on = modelStations.has(s.station_id);
+      b.classList.toggle("active", on);
+      b.style.background = on ? stationColor(s.station_id) : "transparent";
+    };
+    sync();
+    b.addEventListener("click", () => {
+      if (modelStations.has(s.station_id)) modelStations.delete(s.station_id);
+      else modelStations.add(s.station_id);
+      sync();
+      renderModelChart();
+    });
+    box.appendChild(b);
+  });
+  _modelChipsPopulated = true;
 }
 
 // Wrapper: surface ANY error from the render into the chart area (visible to
@@ -3834,72 +3870,84 @@ function renderModelChart() {
 
 function _renderModelChartImpl() {
   if (!_modelData) return;
-  populateModelStationSelect();
-  const varName = document.querySelector('input[name="modelVar"]:checked').value;
-  const info    = MODEL_VAR_INFO[varName];
-  const isSM    = (varName === "sm_surface");
+  populateModelStationChips();
+
+  // Which variables are checked. Soil moisture (surface/root-zone) shares the
+  // LEFT axis (m³/m³); soil temperature goes on a RIGHT axis (°C); precip is
+  // its own reversed right axis. Any combination can be overlaid.
+  const vars = [...document.querySelectorAll('input[name="modelVar"]:checked')].map(v => v.value);
+  const showSurface = vars.includes("sm_surface");
+  const showRoot    = vars.includes("sm_rootzone");
+  const showTemp    = vars.includes("soil_temp_c");
+  const smVars = [];
+  if (showSurface) smVars.push({ key: "sm_surface", dash: "solid", label: "surface" });
+  if (showRoot)    smVars.push({ key: "sm_rootzone", dash: "dash",  label: "root-zone" });
+
   const band = [];   // drawn first → sits behind the lines
   const lines = [];
-  const missing = [];
+  const missing = new Set();
 
   // In-situ reference (surface SM only) — spread band + network mean.
   const showInsitu = document.getElementById("modelShowInsitu").checked;
   const showSpread = document.getElementById("modelShowSpread").checked;
-  let stats = null;
-  if (isSM && showInsitu) {
-    stats = insituDailyStats();
+  if (showSurface && showInsitu) {
+    const stats = insituDailyStats();
     if (stats.x.length && showSpread) {
-      band.push({
-        x: stats.x, y: stats.hi, mode: "lines", line: { width: 0 },
-        hoverinfo: "skip", showlegend: false, name: "+1σ",
-      });
-      band.push({
-        x: stats.x, y: stats.lo, mode: "lines", line: { width: 0 },
+      band.push({ x: stats.x, y: stats.hi, mode: "lines", line: { width: 0 },
+        hoverinfo: "skip", showlegend: false, name: "+1σ" });
+      band.push({ x: stats.x, y: stats.lo, mode: "lines", line: { width: 0 },
         fill: "tonexty", fillcolor: "rgba(100,100,100,0.16)",
-        hoverinfo: "skip", name: "Inter-station ±1σ",
-      });
+        hoverinfo: "skip", name: "Inter-station ±1σ" });
     }
     if (stats.x.length) {
+      lines.push({ x: stats.x, y: stats.mean, name: "In-situ mean (network)",
+        mode: "lines", line: { color: "#111827", width: 2.6 }, connectgaps: false });
+    }
+  }
+
+  // Selected stations (surface SM only), each in its own stable color.
+  if (showSurface) {
+    for (const id of modelStations) {
+      const st = stationDailySeries(id);
+      if (!st.x.length) continue;
+      lines.push({ x: st.x, y: st.y, name: `${id}`,
+        mode: "lines", line: { color: stationColor(id), width: 1.4, dash: "dot" },
+        connectgaps: false });
+    }
+  }
+
+  // Soil-moisture model series (left axis). One trace per (model × SM var);
+  // root-zone is dashed so it's distinguishable from surface at the same color.
+  for (const sv of smVars) {
+    for (const m of _modelChecked()) {
+      const rows = (_modelData[m] || []).filter(r => modelNum(r[sv.key]) !== null);
+      if (!rows.length) { missing.add(`${MODEL_META[m].label} ${sv.label}`); continue; }
       lines.push({
-        x: stats.x, y: stats.mean, name: "In-situ mean (network)",
-        mode: "lines", line: { color: "#111827", width: 2.6 },
+        x: rows.map(r => r.date), y: rows.map(r => +r[sv.key]),
+        name: `${MODEL_META[m].label} ${sv.label}`,
+        mode: "lines", line: { color: MODEL_META[m].color, width: 1.8, dash: sv.dash },
         connectgaps: false,
       });
     }
   }
 
-  // The chosen single station (surface SM only).
-  const stationId = document.getElementById("modelStation")?.value;
-  if (isSM && stationId) {
-    const st = stationDailySeries(stationId);
-    if (st.x.length) {
-      lines.push({
-        x: st.x, y: st.y, name: `${stationId} (single station)`,
-        mode: "lines", line: { color: "#dc2626", width: 1.5, dash: "dot" },
+  // Soil-temperature model series (right axis y2, °C).
+  const tempLines = [];
+  if (showTemp) {
+    for (const m of _modelChecked()) {
+      const rows = (_modelData[m] || []).filter(r => modelNum(r.soil_temp_c) !== null);
+      if (!rows.length) { missing.add(`${MODEL_META[m].label} temp`); continue; }
+      tempLines.push({
+        x: rows.map(r => r.date), y: rows.map(r => +r.soil_temp_c),
+        name: `${MODEL_META[m].label} temp`, yaxis: "y2",
+        mode: "lines", line: { color: MODEL_META[m].color, width: 1.4, dash: "dashdot" },
         connectgaps: false,
+        hovertemplate: `${MODEL_META[m].label}: %{y:.1f} °C<extra></extra>`,
       });
     }
   }
 
-  // Primary-variable model series. Guard empty/null explicitly — +"" and
-  // +null coerce to 0 (finite), which would otherwise draw a bogus
-  // flat-zero line (ERA5-Land has no root-zone column).
-  for (const m of _modelChecked()) {
-    const rows = (_modelData[m] || []).filter(r => modelNum(r[varName]) !== null);
-    if (!rows.length) { missing.push(MODEL_META[m].label); continue; }
-    lines.push({
-      x: rows.map(r => r.date),
-      y: rows.map(r => +r[varName]),
-      name: MODEL_META[m].label,
-      mode: "lines",
-      line: { color: MODEL_META[m].color, width: 1.8 },
-      connectgaps: false,
-    });
-  }
-
-  // Precipitation overlay (bars, secondary reversed axis) — the hydrologic
-  // forcing shown alongside whatever the primary variable is. Per selected
-  // model that has precip; GLDAS has none and is simply skipped.
+  // Precipitation bars (own reversed right axis, y3).
   const showPrecip = document.getElementById("modelShowPrecip")?.checked;
   const precipTraces = [];
   let maxP = 0;
@@ -3912,76 +3960,78 @@ function _renderModelChartImpl() {
       precipTraces.push({
         x: rows.map(r => r.date), y: yy,
         name: `${MODEL_META[m].label} precip`,
-        type: "bar", yaxis: "y2",
+        type: "bar", yaxis: "y3",
         marker: { color: MODEL_META[m].color, opacity: 0.4 },
-        // Bake the model name literally into the tooltip (<extra></extra>
-        // hides the default name box). Avoid %{fullData.*} tokens — some
-        // Plotly builds reject them and blank the whole chart.
         hovertemplate: `${MODEL_META[m].label}: %{y:.1f} mm<extra></extra>`,
       });
     }
   }
 
+  const primary = [...lines, ...tempLines];   // everything that counts as content
   const el = document.getElementById("modelChart");
-  // Bars (precip) first so the primary lines paint on top of them.
-  const traces = [...band, ...precipTraces, ...lines];
-  if (!lines.length) {
+  if (!primary.length) {
     Plotly.purge(el);
-    let why = missing.length
-      ? `No ${info.title.toLowerCase()} data for the selected model(s): ${missing.join(", ")}.`
-      : "Select at least one model.";
-    if (precipTraces.length) why += " (Precipitation is only shown alongside a primary variable.)";
+    let why = "Select at least one variable and model.";
+    if (missing.size) why = `No data for: ${[...missing].join(", ")}.`;
     el.innerHTML = `<div class="chart-msg">${why}</div>`;
     renderModelMetrics();
     return;
   }
-  // Do NOT blanket-clear the div: Plotly.react updates a LIVE chart in
-  // place, and wiping its DOM here (while Plotly's internal state survives)
-  // makes react reconcile against destroyed nodes → a silently blank chart
-  // with no error. This was the "chart vanishes on every interaction" bug.
-  // Only clear a plain-text placeholder so react starts from a clean div.
+  // Only clear a plain-text placeholder — never wipe a live Plotly chart (that
+  // desyncs react's internal state and silently blanks the div).
   if (el.querySelector(".chart-msg")) el.innerHTML = "";
-  const note = missing.length
-    ? `  ·  no ${info.title.toLowerCase()} in ${missing.join(", ")}`
-    : "";
+
+  // Bars behind lines: band → precip → SM/station lines → temp lines.
+  const traces = [...band, ...precipTraces, ...lines, ...tempLines];
+
+  const parts = [];
+  if (smVars.length) parts.push(smVars.map(v => v.label).join(" + ") + " soil moisture");
+  if (showTemp) parts.push("soil temperature");
+  if (precipTraces.length) parts.push("precipitation");
   document.getElementById("modelChartSubtitle").innerHTML =
-    `Daily <b>${info.title.toLowerCase()}</b> at the site pixel` +
-    (isSM ? ", vs the 47-station network mean and one chosen station" : "") +
-    (precipTraces.length ? " · precipitation as bars (right axis)" : "") +
-    note + ".";
+    `Daily <b>${parts.join(", ")}</b> at the site pixel` +
+    (showSurface ? ", vs the network mean" + (modelStations.size ? ` and ${modelStations.size} station(s)` : "") : "") +
+    (missing.size ? `  ·  missing: ${[...missing].join(", ")}` : "") + ".";
+
+  // ---- axes: left = soil moisture; up to two right axes (temp, precip) ----
+  const leftTitle = smVars.length ? "Soil moisture (m³/m³)"
+                  : (showTemp ? "Soil temperature (°C)" : "");
+  // If temp is the only content, it lives on the LEFT; otherwise on y2 (right).
+  const tempOnLeft = showTemp && !smVars.length;
+  if (tempOnLeft) tempLines.forEach(t => { delete t.yaxis; });   // → left 'y'
+
+  const rights = [];   // right-side overlay axes, inner→outer
+  if (showTemp && !tempOnLeft)
+    rights.push({ key: "yaxis2", title: "Soil temperature (°C)" });
+  if (precipTraces.length)
+    rights.push({ key: "yaxis3", title: "Precip (mm/day)", reversed: true });
+
   const layout = {
-    margin: { l: 55, r: precipTraces.length ? 55 : 15, t: 10, b: 40 },
-    xaxis: { type: "date" },
-    yaxis: { title: { text: `${info.title} (${info.unit})` } },
-    legend: { orientation: "h", y: -0.15 },
+    margin: { l: 55, r: rights.length ? 55 : 15, t: 10, b: 40 },
+    xaxis: { type: "date", domain: [0, rights.length >= 2 ? 0.9 : 1] },
+    yaxis: { title: { text: leftTitle } },
+    legend: { orientation: "h", y: -0.18 },
     hovermode: "x unified",
-    barmode: "overlay",   // overlay is stable with bars on a secondary axis
+    barmode: "overlay",
   };
-  if (precipTraces.length) {
-    // Reversed hyetograph on the right: bars hang from the top, given 3×
-    // headroom so they never collide with the primary series below.
-    // showgrid/zeroline off so this axis doesn't add a second, misaligned
-    // set of horizontal gridlines over the primary axis.
-    layout.yaxis2 = {
-      title: { text: "Precip (mm/day)" },
-      overlaying: "y", side: "right",
-      range: [Math.max(1, maxP) * 3, 0],
-      showgrid: false, zeroline: false,
-    };
-  }
-  // Never let a Plotly rejection blank the chart. If the full figure (with
-  // the precip bars + secondary axis) fails, retry with just the primary
-  // lines so the user always sees the time series.
+  rights.forEach((r, i) => {
+    const ax = { title: { text: r.title }, overlaying: "y", side: "right",
+                 showgrid: false, zeroline: false };
+    if (r.reversed) ax.range = [Math.max(1, maxP) * 3, 0];
+    if (i === 0) ax.anchor = "x";              // sits at the plot's right edge
+    else { ax.anchor = "free"; ax.position = 1.0; }
+    layout[r.key] = ax;
+  });
+
+  // Never let a Plotly rejection blank the chart — retry with just the SM lines.
   const cfg = { responsive: true, displaylogo: false };
   try {
     Plotly.react(el, traces, layout, cfg);
   } catch (err) {
-    console.error("[models] Plotly.react failed; retrying without precip/secondary axis", err);
-    const simpleLayout = Object.assign({}, layout);
-    delete simpleLayout.yaxis2;
-    delete simpleLayout.barmode;
+    console.error("[models] Plotly.react failed; retrying simplified", err);
     try {
-      Plotly.react(el, [...band, ...lines], simpleLayout, cfg);
+      Plotly.react(el, [...band, ...lines], { xaxis: { type: "date" },
+        yaxis: { title: { text: leftTitle } }, hovermode: "x unified" }, cfg);
     } catch (err2) {
       console.error("[models] simplified retry also failed", err2);
       el.innerHTML = `<div class="chart-msg">Chart render error: ${err2 && err2.message ? err2.message : err2}</div>`;
@@ -4011,17 +4061,14 @@ function _pairStats(pairs) {
   };
 }
 
-// Surface-SM skill of each model against (a) the network mean and (b) the
-// single chosen station, plus the station's own representativeness error.
+// Surface-SM skill of each model vs the network mean, plus the
+// representativeness error of each selected station vs the network mean.
 function renderModelMetrics() {
   const out = document.getElementById("modelMetrics");
   if (!out || !_modelData) return;
 
   const stats = insituDailyStats();
   const meanByDate = new Map(stats.x.map((d, i) => [d, stats.mean[i]]));
-  const stationId  = document.getElementById("modelStation")?.value;
-  const st = stationId ? stationDailySeries(stationId) : { x: [], y: [] };
-  const stnByDate = new Map(st.x.map((d, i) => [d, st.y[i]]));
 
   const lines = [];
   for (const m of _modelChecked()) {
@@ -4029,40 +4076,37 @@ function renderModelMetrics() {
     const vsMean = _pairStats(rows.filter(r => meanByDate.has(r.date))
       .map(r => [+r.sm_surface, meanByDate.get(r.date)]));
     if (!vsMean) { lines.push(`<b>${MODEL_META[m].label}</b>: not enough overlap`); continue; }
-    let s = `<b>${MODEL_META[m].label}</b> (n=${vsMean.n}): R ${vsMean.r.toFixed(2)}, ` +
-            `bias ${vsMean.bias >= 0 ? "+" : ""}${vsMean.bias.toFixed(3)}, ` +
-            `ubRMSE ${vsMean.ubrmse.toFixed(3)}`;
-    const vsStn = stationId ? _pairStats(rows.filter(r => stnByDate.has(r.date))
-      .map(r => [+r.sm_surface, stnByDate.get(r.date)])) : null;
-    if (vsStn) {
-      s += `<br><span style="color:var(--muted);">&nbsp;&nbsp;[vs ${stationId}: ` +
-           `R ${vsStn.r.toFixed(2)}, ubRMSE ${vsStn.ubrmse.toFixed(3)}]</span>`;
-    }
-    lines.push(s);
+    lines.push(`<b>${MODEL_META[m].label}</b> (n=${vsMean.n}): R ${vsMean.r.toFixed(2)}, ` +
+      `bias ${vsMean.bias >= 0 ? "+" : ""}${vsMean.bias.toFixed(3)}, ` +
+      `ubRMSE ${vsMean.ubrmse.toFixed(3)} m³/m³`);
   }
 
-  // Representativeness error of the chosen station vs the network mean.
-  if (stationId) {
-    const rep = _pairStats(st.x
-      .filter(d => meanByDate.has(d))
-      .map(d => [stnByDate.get(d), meanByDate.get(d)]));
-    if (rep) {
+  // Representativeness error per selected station (station vs network mean).
+  if (modelStations.size) {
+    const reps = [];
+    for (const id of modelStations) {
+      const st = stationDailySeries(id);
+      const stnByDate = new Map(st.x.map((d, i) => [d, st.y[i]]));
+      const rep = _pairStats(st.x.filter(d => meanByDate.has(d))
+        .map(d => [stnByDate.get(d), meanByDate.get(d)]));
+      if (rep) reps.push(`<span style="color:${stationColor(id)};font-weight:600;">${id}</span>` +
+        ` ubRMSE ${rep.ubrmse.toFixed(3)}, bias ${rep.bias >= 0 ? "+" : ""}${rep.bias.toFixed(3)} (n=${rep.n})`);
+    }
+    if (reps.length) {
       lines.push(
         `<div style="margin-top:6px;border-top:1px solid var(--border-dark);padding-top:6px;">` +
-        `<b>Representativeness</b> — ${stationId} vs network mean (n=${rep.n}):<br>` +
-        `ubRMSE ${rep.ubrmse.toFixed(3)}, bias ${rep.bias >= 0 ? "+" : ""}${rep.bias.toFixed(3)}, ` +
-        `R ${rep.r.toFixed(2)} m³/m³<br>` +
-        `<span style="color:var(--muted);">One sensor differs from the field ` +
-        `average by ~${rep.ubrmse.toFixed(3)} m³/m³ — before any model enters.</span></div>`);
+        `<b>Representativeness</b> — station vs network mean:<br>` + reps.join("<br>") +
+        `<br><span style="color:var(--muted);">how far one sensor sits from the ` +
+        `field average, before any model enters.</span></div>`);
     }
   }
   out.innerHTML = lines.length ? lines.join("<br>") : "—";
 }
 
-// Model tab controls → re-render (checkboxes, variable radio, station select,
-// spread toggle).
+// Model tab controls → re-render (model checkboxes, variable checkboxes,
+// spread + precip toggles). Station chips wire their own click handlers.
 document.querySelectorAll(
-  '#modelToggles input, input[name="modelVar"], #modelStation, #modelShowSpread, #modelShowPrecip'
+  '#modelToggles input, input[name="modelVar"], #modelShowSpread, #modelShowPrecip'
 ).forEach(el => el.addEventListener("change", renderModelChart));
 
 // =============================================================

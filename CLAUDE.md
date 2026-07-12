@@ -427,13 +427,29 @@ AI prediction · Visitor History · **About Data** · Support.
   model has every variable — ERA5-Land has no root-zone column, GLDAS has
   no precip; the UI notes these instead of drawing a flat-zero line (empty
   CSV cells MUST be guarded — `+""`/`+null` are 0/finite; use `modelNum()`).
-  **Representativeness view** (educational): pick one station in the side
-  panel to overlay it (red dotted) plus the ±1σ inter-station spread band;
-  the skill card then adds each model's score against that single station
-  (`[vs HPxxxx]`) alongside the network-mean score, and the station's own
-  ubRMSE vs the network mean — the representativeness error, i.e. why one
-  point can't validate a coarse pixel. All of this is surface-SM only (the
-  only variable the in-situ network measures) and reuses `daily_sm.json`.
+  **Variables are checkboxes, overlaid on up to 3 axes**: surface + root-zone
+  SM share the LEFT axis (m³/m³; root-zone dashed), soil temp goes on a RIGHT
+  axis (°C; if temp is the ONLY variable it moves to the left), precip is its
+  own reversed RIGHT axis (bars). `_renderModelChartImpl` builds a `rights[]`
+  list and positions the extra axes (inner at the plot edge via `anchor:'x'`,
+  outer at paper `position:1.0` with `anchor:'free'`, shrinking `xaxis.domain`
+  when two right axes coexist).
+  **Representativeness view** (educational): stations are a multi-select CHIP
+  row (`#modelStationChips`, state in the `modelStations` Set, stable color
+  per station via `stationColor()`), not a dropdown. Selected stations overlay
+  their surface-SM series (dotted, chip-colored) against the network mean + ±1σ
+  spread band; the skill card lists each model vs the network mean plus each
+  selected station's ubRMSE vs the mean — the representativeness error, i.e.
+  why one point can't validate a coarse pixel. In-situ overlays are surface-SM
+  only and reuse `daily_sm.json`.
+  **Two hard-won invariants** (both caused "chart vanishes" bugs): (1) NEVER
+  `el.innerHTML=""` on a live Plotly div before `Plotly.react` — it desyncs
+  react's internal state and silently blanks the chart; only clear a
+  `.chart-msg` placeholder. (2) avoid `barmode:"group"` with bars on an
+  overlaying axis and `%{fullData.*}` hovertemplate tokens — some plotly-basic
+  builds reject them. The Models chart code is verified with a real-browser
+  harness (see scratchpad `server2.py` + injected test), because a no-op
+  Plotly mock cannot reproduce these state-desync failures.
 - **AI prediction** — placeholder ("coming soon").
 
 ## Footer logos (in order)
