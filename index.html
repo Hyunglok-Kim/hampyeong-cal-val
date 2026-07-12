@@ -1052,19 +1052,37 @@
     .tab { padding: 7px 12px; font-size: 12px; }
     #map { height: 300px; }
   }
-/* Models tab — a wide, short time-series chart on top; controls as an
-   aligned card grid below (not the chart-left / panel-right split).
+/* Models tab — a wide, short time-series chart on top; controls below.
    Toggled by the `models-mode` class on the .layout container. */
 .layout.models-mode { grid-template-columns: 1fr; }
 #modelChart { height: 240px; }
 .layout.models-mode #side-model {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  align-items: start;
 }
-.layout.models-mode #side-model > .station-id { grid-column: 1 / -1; margin: 0; }
-.layout.models-mode #side-model > .card { margin: 0; height: 100%; }
+.layout.models-mode #side-model > .station-id { margin: 0; }
+/* controls row: the 3 stacked cards (narrow) share a row with the explainer
+   GIF card (wider). Wraps to a single column when the page is narrow. */
+.model-controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+}
+.model-cards-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 300px;
+  min-width: 0;
+}
+.model-cards-col > .card { margin: 0; }
+.model-controls-row > .card.model-why {
+  flex: 1.3 1 340px;
+  min-width: 0;
+  margin: 0;
+}
 /* Station multi-select chips (Models tab) — always-visible scrollbar so
    it's obvious the list scrolls (macOS hides overlay scrollbars otherwise). */
 .model-chip-row {
@@ -1825,6 +1843,9 @@
     <div class="side" id="side-model" style="display:none;">
       <div class="station-id">Land-surface models</div>
 
+      <div class="model-controls-row">
+      <div class="model-cards-col">
+
       <div class="card">
         <h4 style="margin-top:0;">Models</h4>
         <div class="lband-row" id="modelToggles">
@@ -1878,9 +1899,11 @@
         </div>
       </div>
 
-      <!-- Why-no-map explainer — 4th card; a portrait animation matching the
-           dark card background (full-bleed, no seam). -->
-      <div class="card">
+      </div><!-- /model-cards-col -->
+
+      <!-- Why-no-map explainer — wider card sharing the row with the 3 stacked
+           cards; a portrait animation matching the dark card background. -->
+      <div class="card model-why">
         <h4 style="margin-top:0;">Why a chart, not a map?</h4>
         <a href="assets/why-no-map.gif" target="_blank" rel="noopener"
            title="Open full size" style="display:block;margin:6px -16px 0;">
@@ -1895,6 +1918,8 @@
           that pixel's daily value instead. <span style="color:var(--muted);">Tap to enlarge.</span>
         </div>
       </div>
+
+      </div><!-- /model-controls-row -->
 
     </div>
     <div class="side" id="side-ai" style="display:none;">

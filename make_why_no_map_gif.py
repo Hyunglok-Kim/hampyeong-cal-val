@@ -140,9 +140,9 @@ for _ in range(12):
 
 # --------------------------------------------------------------------------
 # portrait: square map on top, wide-short series below.
-fig = plt.figure(figsize=(4.7, 6.5), dpi=100)
+fig = plt.figure(figsize=(4.9, 6.0), dpi=100)
 fig.patch.set_facecolor(BG)
-axMap = fig.add_axes([0.15, 0.545, 0.70, 0.385])   # square-ish, upper
+axMap = fig.add_axes([0.155, 0.535, 0.69, 0.40])   # square-ish, upper
 axSer = fig.add_axes([0.16, 0.115, 0.72, 0.195])   # wide-short, lower
 
 
