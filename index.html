@@ -1065,8 +1065,26 @@
 }
 .layout.models-mode #side-model > .station-id { grid-column: 1 / -1; margin: 0; }
 .layout.models-mode #side-model > .card { margin: 0; height: 100%; }
-/* Station multi-select chips (Models tab) */
-.model-chip-row { display: flex; flex-wrap: wrap; gap: 4px; max-height: 132px; overflow-y: auto; }
+/* Station multi-select chips (Models tab) — always-visible scrollbar so
+   it's obvious the list scrolls (macOS hides overlay scrollbars otherwise). */
+.model-chip-row {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  max-height: 118px; overflow-y: scroll;
+  padding: 6px; border: 1px solid var(--border-dark); border-radius: 6px;
+  scrollbar-width: thin;                       /* Firefox */
+  scrollbar-color: var(--muted) rgba(255,255,255,0.08);
+}
+.model-chip-row::-webkit-scrollbar { width: 11px; }
+.model-chip-row::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.08); border-radius: 6px;
+}
+.model-chip-row::-webkit-scrollbar-thumb {
+  background: var(--muted); border-radius: 6px;
+  border: 2px solid transparent; background-clip: content-box;
+}
+.model-chip-row::-webkit-scrollbar-thumb:hover {
+  background: var(--panel-text); background-clip: content-box;
+}
 .model-chip {
   font-size: 11px; line-height: 1.2; padding: 3px 8px;
   border: 1px solid var(--border-dark); border-radius: 11px;
