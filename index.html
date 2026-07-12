@@ -1837,10 +1837,7 @@
           <label><input type="checkbox" id="modelShowInsitu" checked>
             <b>In-situ network mean</b> <span style="color:var(--muted);font-size:11px;">47 stations · reference</span></label>
         </div>
-      </div>
-
-      <div class="card">
-        <h4 style="margin-top:0;">Variables (overlay)</h4>
+        <h4 style="margin:14px 0 0;border-top:1px solid var(--border-dark);padding-top:12px;">Variables (overlay)</h4>
         <div class="lband-row">
           <label><input type="checkbox" name="modelVar" value="sm_surface" checked> Surface soil moisture <span style="color:var(--muted);font-size:11px;">m³/m³ · left</span></label>
           <label><input type="checkbox" name="modelVar" value="sm_rootzone"> Root-zone soil moisture <span style="color:var(--muted);font-size:11px;">m³/m³ · left</span></label>
@@ -1884,13 +1881,13 @@
       <div class="card">
         <h4 style="margin-top:0;">Why no map?</h4>
         <a href="assets/why-no-map.gif" target="_blank" rel="noopener"
-           title="Open full size">
+           title="Open full size" style="display:block;margin:6px -16px 0;">
           <img src="assets/why-no-map.gif"
                alt="Animation: soil moisture varies over meters, but a 9–25 km model pixel swallows the whole 1-km site into a single flat value — so we plot that pixel's value over time instead of drawing a map."
-               style="width:100%;border-radius:8px;border:1px solid var(--border-dark);display:block;"
+               style="width:100%;display:block;border-top:1px solid var(--border-dark);border-bottom:1px solid var(--border-dark);"
                loading="lazy">
         </a>
-        <div style="font-size:11px;color:var(--muted);margin:4px 0 8px;text-align:right;">
+        <div style="font-size:11px;color:var(--muted);margin:6px 0 8px;text-align:right;">
           tap to enlarge
         </div>
         <div style="font-size:12px;line-height:1.6;color:var(--panel-text);">

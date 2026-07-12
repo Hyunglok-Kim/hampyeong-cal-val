@@ -143,8 +143,10 @@ for _ in range(12):                     # end hold
                "One pixel = one number → we plot it over time"))
 
 # --------------------------------------------------------------------------
-fig, ax = plt.subplots(figsize=(6.6, 4.4), dpi=100)
+fig, ax = plt.subplots(figsize=(7.2, 4.8), dpi=100)
 fig.patch.set_facecolor(BG)
+# reserve headroom for the title (above axes) and the caption (below axes)
+fig.subplots_adjust(left=0.03, right=0.97, top=0.85, bottom=0.13)
 
 
 def draw_map(a, b, t, res, cap, frame_i):
@@ -177,8 +179,8 @@ def draw_map(a, b, t, res, cap, frame_i):
         ax.annotate("your 1-km cell",
                     xy=(CX + CELL / 2, CY + CELL / 2),
                     xytext=(CX + 5.2, CY + 6.4),
-                    color=INK, fontsize=9, ha="left", va="center",
-                    arrowprops=dict(arrowstyle="->", color=ACCENT, lw=1.4))
+                    color=INK, fontsize=12, ha="left", va="center",
+                    arrowprops=dict(arrowstyle="->", color=ACCENT, lw=1.6))
 
     ax.set_xlim(0, DOM); ax.set_ylim(0, DOM)
     ax.set_aspect("equal"); ax.set_xticks([]); ax.set_yticks([])
@@ -199,27 +201,27 @@ def draw_concl(t, res, cap):
     # left: the single flat pixel
     flat = float(FIELDS[27].mean())
     col = SM_CMAP((flat - VMIN) / (VMAX - VMIN))
-    ax.add_patch(Rectangle((0.4, 3.0), 2.6, 2.6, fc=col, ec=ACCENT, lw=2.2))
-    ax.text(1.7, 2.5, "1 model pixel\n= 1 value", color=INK, fontsize=9,
+    ax.add_patch(Rectangle((0.4, 3.0), 2.6, 2.6, fc=col, ec=ACCENT, lw=2.4))
+    ax.text(1.7, 2.5, "1 model pixel\n= 1 value", color=INK, fontsize=12,
             ha="center", va="top")
     ax.annotate("", xy=(4.2, 4.3), xytext=(3.2, 4.3),
-                arrowprops=dict(arrowstyle="-|>", color=MUTED, lw=2))
+                arrowprops=dict(arrowstyle="-|>", color=MUTED, lw=2.4))
 
     # right: SMAP series drawing itself in
     x0, x1, y0, y1 = 4.6, 9.7, 1.6, 7.2
-    ax.plot([x0, x0, x1], [y1, y0, y0], color=MUTED, lw=1.0)  # axes
+    ax.plot([x0, x0, x1], [y1, y0, y0], color=MUTED, lw=1.2)  # axes
     n = max(2, int(len(SERIES) * t))
     ys = SERIES[:n]
     xs = np.linspace(x0, x1, len(SERIES))[:n]
     yy = y0 + (ys - VMIN) / (VMAX - VMIN) * (y1 - y0)
-    ax.plot(xs, yy, color="#38bdf8", lw=1.8)
+    ax.plot(xs, yy, color="#38bdf8", lw=2.0)
     if n:
-        ax.scatter([xs[-1]], [yy[-1]], s=22, color="#38bdf8", zorder=5)
+        ax.scatter([xs[-1]], [yy[-1]], s=28, color="#38bdf8", zorder=5)
     ax.text((x0 + x1) / 2, y1 + 0.55, "SMAP L4 surface soil moisture",
-            color=MUTED, fontsize=8.5, ha="center")
-    ax.text(x0 - 0.15, y1, "wet", color=MUTED, fontsize=7.5, ha="right", va="center")
-    ax.text(x0 - 0.15, y0, "dry", color=MUTED, fontsize=7.5, ha="right", va="center")
-    ax.text((x0 + x1) / 2, y0 - 0.55, "time →", color=MUTED, fontsize=8, ha="center")
+            color=MUTED, fontsize=11, ha="center")
+    ax.text(x0 - 0.15, y1, "wet", color=MUTED, fontsize=10, ha="right", va="center")
+    ax.text(x0 - 0.15, y0, "dry", color=MUTED, fontsize=10, ha="right", va="center")
+    ax.text((x0 + x1) / 2, y0 - 0.55, "time →", color=MUTED, fontsize=10.5, ha="center")
 
     _titles(res, cap)
 
@@ -227,14 +229,14 @@ def draw_concl(t, res, cap):
 def _titles(res, cap):
     # title sits ABOVE the axes; resolution badge sits INSIDE the top-right
     # corner (chip on a dark box) so the two never collide.
-    ax.text(0.0, 1.09, "Why the Models tab has no map",
-            transform=ax.transAxes, color=INK, fontsize=13, fontweight="bold",
+    ax.text(0.0, 1.10, "Why the Models tab has no map",
+            transform=ax.transAxes, color=INK, fontsize=17, fontweight="bold",
             ha="left", va="top")
     ax.text(0.965, 0.94, res, transform=ax.transAxes, color=ACCENT,
-            fontsize=15, fontweight="bold", ha="right", va="top", zorder=8,
-            bbox=dict(boxstyle="round,pad=0.32", fc=BG, ec=ACCENT, lw=1.3))
-    ax.text(0.0, -0.06, cap, transform=ax.transAxes, color=MUTED,
-            fontsize=9.5, ha="left", va="top")
+            fontsize=20, fontweight="bold", ha="right", va="top", zorder=8,
+            bbox=dict(boxstyle="round,pad=0.34", fc=BG, ec=ACCENT, lw=1.5))
+    ax.text(0.0, -0.075, cap, transform=ax.transAxes, color=MUTED,
+            fontsize=12.5, ha="left", va="top")
 
 
 def update(i):
