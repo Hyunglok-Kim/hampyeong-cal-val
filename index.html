@@ -3819,7 +3819,20 @@ function populateModelStationSelect() {
   _modelStationPopulated = true;
 }
 
+// Wrapper: surface ANY error from the render into the chart area (visible to
+// the user) instead of letting an uncaught throw silently blank the div.
 function renderModelChart() {
+  try {
+    _renderModelChartImpl();
+  } catch (err) {
+    console.error("[models] render threw", err);
+    const el = document.getElementById("modelChart");
+    if (el) el.innerHTML =
+      `<div class="chart-msg">Chart error: ${err && err.message ? err.message : err}</div>`;
+  }
+}
+
+function _renderModelChartImpl() {
   if (!_modelData) return;
   populateModelStationSelect();
   const varName = document.querySelector('input[name="modelVar"]:checked').value;
@@ -3951,7 +3964,24 @@ function renderModelChart() {
       showgrid: false, zeroline: false,
     };
   }
-  Plotly.react(el, traces, layout, { responsive: true, displaylogo: false });
+  // Never let a Plotly rejection blank the chart. If the full figure (with
+  // the precip bars + secondary axis) fails, retry with just the primary
+  // lines so the user always sees the time series.
+  const cfg = { responsive: true, displaylogo: false };
+  try {
+    Plotly.react(el, traces, layout, cfg);
+  } catch (err) {
+    console.error("[models] Plotly.react failed; retrying without precip/secondary axis", err);
+    const simpleLayout = Object.assign({}, layout);
+    delete simpleLayout.yaxis2;
+    delete simpleLayout.barmode;
+    try {
+      Plotly.react(el, [...band, ...lines], simpleLayout, cfg);
+    } catch (err2) {
+      console.error("[models] simplified retry also failed", err2);
+      el.innerHTML = `<div class="chart-msg">Chart render error: ${err2 && err2.message ? err2.message : err2}</div>`;
+    }
+  }
   renderModelMetrics();
 }
 
