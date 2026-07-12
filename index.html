@@ -1341,25 +1341,6 @@
         </div>
       </div>
       <div id="modelChart" style="width:100%;"></div>
-
-      <!-- Why-no-map explainer — a wide, short banner (same height as a
-           control card) spanning the full chart width. -->
-      <figure style="margin:14px 0 4px;">
-        <a href="assets/why-no-map.gif" target="_blank" rel="noopener"
-           title="Open full size" style="display:block;">
-          <img src="assets/why-no-map.gif"
-               alt="Animation: soil moisture varies over meters, but a 9–25 km model pixel swallows the whole 1-km site into a single flat value — so we plot that pixel's value over time instead of drawing a map."
-               style="width:100%;display:block;border:1px solid var(--border-dark);border-radius:10px;box-shadow:0 1px 6px rgba(15,23,42,0.12);"
-               loading="lazy">
-        </a>
-        <figcaption style="font-size:12.5px;line-height:1.6;color:var(--muted-on-light);margin-top:8px;">
-          <b style="color:var(--text);">Why a chart and not a map?</b>
-          These land-surface models are 9–25 km per pixel — the entire 1-km
-          cal/val site sits inside <b>one</b> pixel, so a map overlay would be
-          a single flat color. We pull that pixel's value as a daily time
-          series (above) and compare it against the ground truth instead.
-        </figcaption>
-      </figure>
     </div>
     <div class="map-col" id="mapCol">
       <div id="map"></div>
@@ -1894,6 +1875,24 @@
           root-mean-square error. <b>[vs station]</b> repeats each model's
           skill scored against the single station instead of the network
           mean — usually worse, showing the cost of single-point validation.
+        </div>
+      </div>
+
+      <!-- Why-no-map explainer — 4th card; a portrait animation matching the
+           dark card background (full-bleed, no seam). -->
+      <div class="card">
+        <h4 style="margin-top:0;">Why a chart, not a map?</h4>
+        <a href="assets/why-no-map.gif" target="_blank" rel="noopener"
+           title="Open full size" style="display:block;margin:6px -16px 0;">
+          <img src="assets/why-no-map.gif"
+               alt="Animation: a soil-moisture field coarsens from 1 km to 25 km until the whole 1-km cal/val site is one flat model pixel, then the SMAP daily time series draws in — showing why models are a chart, not a map."
+               style="width:100%;display:block;"
+               loading="lazy">
+        </a>
+        <div class="stats-hint" style="margin-top:10px;">
+          These models are 9–25 km per pixel — the 1-km site sits inside
+          <b>one</b> pixel, so a map would be a single flat color. We plot
+          that pixel's daily value instead. <span style="color:var(--muted);">Tap to enlarge.</span>
         </div>
       </div>
 
