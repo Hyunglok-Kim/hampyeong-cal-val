@@ -1140,7 +1140,7 @@
    15 s safety timer if anything upstream fails). */
 #bootOverlay {
   position: fixed; inset: 0; z-index: 9999;
-  background: #efeae0;
+  background: #f6f7f9;                 /* matches --bg so the reveal is seamless */
   display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 16px;
   transition: opacity .35s ease;
@@ -2150,6 +2150,17 @@ document.getElementById("layerImagery").addEventListener("change", e => {
   else                  map.removeLayer(imageryLayer);
 });
 
+// Hold the boot overlay until BOTH the stations are placed AND the aerial
+// tiles have actually painted — otherwise the overlay lifts on the (fast,
+// local) stations CSV while the (slower, remote) Esri tiles are still
+// downloading, and the map flashes its white background. Either flag can
+// arrive first; the last one dismisses. Fallbacks: a 5 s cap once markers
+// are ready (in case tiles are slow) and the global 15 s safety timer.
+window._maybeDismissBoot = function () {
+  if (window._bootTilesReady && window._bootStationsReady) window.dismissBootOverlay?.();
+};
+imageryLayer.once("load", () => { window._bootTilesReady = true; window._maybeDismissBoot(); });
+
 // =============================================================
 // Custom panes — fixes the z-order so station markers (default
 // markerPane @ z 600) are ALWAYS on top, KML grid lines sit above
@@ -2416,8 +2427,12 @@ Papa.parse(STATIONS_CSV, {
     if (defaultStation) selectStation(defaultStation);
     loadOverlayData();   // daily SM + UAV catalog after stations are placed
     computeNetworkStats(stations);   // populate Network card
-    // Map + markers are interactive — drop the boot skeleton.
-    window.dismissBootOverlay?.();
+    // Markers placed — but wait for the aerial tiles to paint before lifting
+    // the overlay so the map doesn't flash white. If tiles are slow, don't
+    // hold the spinner more than 5 s past this point.
+    window._bootStationsReady = true;
+    window._maybeDismissBoot?.();
+    setTimeout(() => window.dismissBootOverlay?.(), 5000);
   },
   error: (err) => {
     console.error("Failed to load stations.csv", err);
