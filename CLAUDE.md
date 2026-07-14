@@ -147,9 +147,49 @@ zero-padded ISMN-style `HPGGNN` (HP1301, HP0102, HP2503, …).
 
 `/Users/hyunglokkim/data_1` and `/Users/hyunglokkim/data_2` are NFS shares
 from `192.168.50.104` (`/data` and `/data2`). Configured via autofs — they
-mount on first access, no manual `sudo mount` after reboot. Setup script:
-`/tmp/setup_automount.sh` (one-shot, `sudo bash ...`). Config lives in
-`/etc/auto_nfs` with the entry in `/etc/auto_master`.
+mount on first access, no manual `sudo mount` after reboot. Config lives in
+`/etc/auto_nfs`, referenced by a `/-  auto_nfs` line in `/etc/auto_master`.
+
+**A macOS update reverts `/etc/auto_master` to stock and silently kills the
+automount** (the `/etc/auto_nfs` map survives; only the reference is lost).
+Symptom: `/Users/hyunglokkim/data_1` is an empty directory. Restore with:
+
+```bash
+printf '/-\t\t\tauto_nfs\n' | sudo tee -a /etc/auto_master >/dev/null && sudo automount -vc
+```
+
+### 1c. Soil properties — lab-measured samples (`build_soil_sampling.py`)
+
+Two *different* sources of soil numbers exist; never mix them up:
+
+| source | where | what |
+|---|---|---|
+| **Lab-measured** | NAS `GIST_ISMN_admin/Metadata_Sampling/` | a core dug at the station, analysed in the lab. Sand/silt/clay, USDA texture, organic C, total C, organic matter, at the sensor depth (10 cm irrigated / 20 cm bank) |
+| **Database estimate** | `stations.csv` (`clay_pct`, `sand_pct`, …) | Korean Soil Information System — one generic value for the whole site |
+
+```bash
+/usr/bin/python3 build_soil_sampling.py     # NAS must be mounted
+```
+
+Copies the ISMN sheets verbatim to `data/in_situ/metadata_sampling/` and writes
+`data/in_situ/soil_sampling.json` (`{station: {landcover, climate, spots:
+{irr|bank: {depth_m, sand, silt, clay, texture, oc, tc, om}}}}`). It warns if
+sand+silt+clay doesn't close to ~100 %.
+
+Front-end contract:
+- Stations present in `soil_sampling.json` get the **`.soil` class → blue
+  pulsing ring** (`::before`). The 30-day "recent data" ring is red and lives
+  on `::after`, so **a station can pulse both** — keep them on separate
+  pseudo-elements.
+- `renderStationInfo()` shows the measured block with a **`lab-measured`**
+  badge; unsampled stations fall back to `stations.csv` with a
+  **`database estimate`** badge. The badge is the whole point — never render
+  soil numbers without saying which source they came from.
+- `soil_sampling.json` is fetched in `loadOverlayData()` and is *optional*
+  (a 404 must not break the overlay load). It resolves after the default
+  station is selected, so that handler re-calls `renderStationInfo()`.
+
+Only a few stations are sampled so far; re-run the script as more land.
 
 ### 2. Basemaps (LULC, DEM, soil properties, ...)
 ```bash

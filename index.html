@@ -942,6 +942,60 @@
     70%  { box-shadow: 0 0 0 10px rgba(239,68,68,0);   }
     100% { box-shadow: 0 0 0 0   rgba(239,68,68,0);   }
   }
+  /* "Soil sampled" pulse — this station has lab-measured soil properties
+     (a dug sample analysed in the lab, not the national-database estimate).
+     Painted on ::before, and the red .recent ring on ::after, so a station
+     that is BOTH recently-reporting and soil-sampled pulses both rings. The
+     blue ring expands wider and starts half a cycle later, so the two pings
+     alternate instead of sitting on top of each other. */
+  .station-dot.soil::before {
+    content: "";
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.70);
+    animation: stationPulseBlue 2s ease-out infinite;
+    animation-delay: 1s;
+    pointer-events: none;
+  }
+  .station-dot.soil.selected::before { width: 18px; height: 18px; }
+  @keyframes stationPulseBlue {
+    0%   { box-shadow: 0 0 0 0    rgba(37,99,235,0.75); }
+    70%  { box-shadow: 0 0 0 14px rgba(37,99,235,0);    }
+    100% { box-shadow: 0 0 0 0    rgba(37,99,235,0);    }
+  }
+  .pulse-legend-dot.soil-dot {
+    box-shadow: 0 0 0 0 rgba(37,99,235,0.75);
+    animation: stationPulseBlue 2s ease-out infinite;
+  }
+  /* Soil-properties block in the station info card. The badge says whether
+     the numbers are a real lab assay or the national-database estimate. */
+  .soil-block {
+    margin-top: 10px; padding-top: 8px;
+    border-top: 1px solid var(--border-dark);
+  }
+  .soil-head {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    font-weight: 600; color: var(--panel-text);
+  }
+  .soil-badge {
+    font-size: 10px; font-weight: 700; letter-spacing: .03em;
+    text-transform: uppercase; white-space: nowrap;
+    padding: 2px 6px; border-radius: 10px;
+    background: rgba(37,99,235,0.20); color: #93c5fd;
+    border: 1px solid rgba(37,99,235,0.55);
+  }
+  .soil-badge.est {
+    background: rgba(148,163,184,0.15); color: var(--muted);
+    border-color: rgba(148,163,184,0.40);
+  }
+  .soil-spot { margin-top: 6px; }
+  .soil-spot b { color: var(--panel-text); }
+  .soil-src {
+    margin-top: 7px; font-size: 11px; line-height: 1.45; color: var(--muted);
+  }
 
   /* ============================================================
      Mobile responsive layout (phones / narrow tablets).
@@ -1274,6 +1328,37 @@
           is less than 30 days old pulse with a red ring on the map.
         </p>
 
+        <h3>2b. Soil properties — measured, not estimated</h3>
+        <p>
+          A soil-moisture sensor reading only means something if you know the
+          soil it sits in, so we <b>dig a soil core at the station and send it
+          to the laboratory</b>. For each sampled spot the lab reports:
+        </p>
+        <ul>
+          <li><b>Particle size</b> — sand / silt / clay fractions (%), and the
+            resulting <b>USDA texture class</b> (e.g. silt loam, loam)</li>
+          <li><b>Carbon</b> — organic carbon, total carbon, and organic
+            matter (%)</li>
+        </ul>
+        <p>
+          Samples are taken at the same depths as the sensors — <b>10 cm</b> in
+          the irrigated zone and <b>20 cm</b> in the paddy bank — so the soil
+          description matches the measurement. These are <b>real laboratory
+          values</b>, and they matter: at Hampyeong the measured organic carbon
+          comes out several times higher than the national-database estimate,
+          which is exactly the kind of difference that shifts a soil-moisture
+          retrieval.
+        </p>
+        <p>
+          Sampling is still in progress — only <b>some stations</b> have been
+          cored so far. Those stations <b>pulse with a blue ring</b> on the map,
+          and their info panel shows the numbers with a
+          <b>“lab-measured”</b> badge. Stations not yet sampled fall back to the
+          <b>Korean Soil Information System</b> (a national database estimate)
+          and are labelled <b>“database estimate”</b>, so the two are never
+          mixed up. Measured values are published as ISMN static variables.
+        </p>
+
         <h3>3. UAV (drone) campaigns</h3>
         <p>
           Roughly every 1–2 weeks in season we fly the full cell and
@@ -1522,6 +1607,13 @@
             <span class="pulse-legend-dot"></span> Pulsing red ring marks
             stations whose newest reading is within the last 30 days
             (relative to the freshest reading in the network).
+          </span>
+          <br>
+          <span class="pulse-legend">
+            <span class="pulse-legend-dot soil-dot"></span> Pulsing
+            <b>blue</b> ring marks stations with <b>lab-measured</b> soil
+            properties (texture, particle size, organic carbon) from a soil
+            core dug on site. A station can pulse both rings.
           </span>
         </div>
       </div>
@@ -2309,6 +2401,7 @@ let varState = [];          // [{name, cat, color, checked}, ...]
 
 // overlay state
 let dailySM = null;         // { dates: [...], byDate: { '2025-06-01': {HP_1-1: 0.24, ...}, ... } }
+let soilSampling = {};      // lab-measured soil properties, by station (build_soil_sampling.py)
 let uavCatalog = [];        // [{date, file, n,s,e,w, ...}]
 let uavLayer = null;        // current Leaflet imageOverlay
 let uavLayerRow = null;     // catalog row backing uavLayer (for dynamic TIR)
@@ -2498,6 +2591,15 @@ function markRecentStations(lastTsByStation) {
   });
 }
 
+// Toggle the .soil class (blue pulse) on stations that have lab-measured soil
+// properties from a dug sample. Independent of .recent — a station can pulse
+// both rings.
+function markSoilStations() {
+  document.querySelectorAll(".station-dot").forEach(el => {
+    el.classList.toggle("soil", !!soilSampling[el.getAttribute("data-id")]);
+  });
+}
+
 function loadOverlayData() {
   // Fast path — read the precomputed daily surface-SM index + last-timestamp
   // index that prep_insitu_standard.py writes. Replaces the old 47-way
@@ -2506,9 +2608,18 @@ function loadOverlayData() {
   Promise.all([
     fetch("data/in_situ/daily_sm.json").then(r => r.json()),
     fetch("data/in_situ/last_ts.json").then(r => r.json()),
-  ]).then(([daily, lastTs]) => {
+    // Optional — only a few stations are sampled so far; an absent/!ok file
+    // must not take the whole overlay load down with it.
+    fetch("data/in_situ/soil_sampling.json")
+      .then(r => (r.ok ? r.json() : {})).catch(() => ({})),
+  ]).then(([daily, lastTs, soil]) => {
     dailySM = { dates: daily.dates || [], byDate: daily.byDate || {} };
+    soilSampling = soil || {};
     markRecentStations(lastTs || {});
+    markSoilStations();
+    // The default station is selected before this resolves, so refresh its
+    // info card now that the measured soil numbers are in.
+    if (currentStation) renderStationInfo(currentStation);
     const di = document.getElementById("overlayDate");
     if (!di.value && dailySM.dates.length) {
       di.value = dailySM.dates[dailySM.dates.length - 1];
@@ -2591,6 +2702,87 @@ function addStationMarker(s) {
   stationMarkers[s.station_id] = m;
 }
 
+// USDA texture classes as they appear in the lab sheets.
+const SOIL_TEXTURE_NAMES = {
+  S: "Sand", LS: "Loamy sand", SL: "Sandy loam", L: "Loam", SiL: "Silt loam",
+  Si: "Silt", SCL: "Sandy clay loam", CL: "Clay loam", SiCL: "Silty clay loam",
+  SC: "Sandy clay", SiC: "Silty clay", C: "Clay",
+};
+// Sampling spots, as used in the ISMN filenames.
+const SOIL_SPOT_NAMES = {
+  irr: "Irrigated zone", bank: "Paddy bank", field: "Field",
+  soil: "Soil", root: "Root zone", tree: "Tree trunk",
+};
+
+// Station info card. The soil block prefers the LAB-MEASURED sample — a core
+// dug at the station and analysed for particle size + carbon (these stations
+// pulse blue on the map). Stations not yet sampled fall back to the national
+// database estimate carried in stations.csv, and the badge says which is which
+// so the two are never confused.
+function renderStationInfo(s) {
+  document.getElementById("stationLabel").textContent = `Station ID (${s.station_id})`;
+  const flavorTxt = s.sensor_flavors ? ` (${s.sensor_flavors})` : "";
+  const meas = soilSampling[s.station_id];
+  let soilHtml = "";
+
+  if (meas && meas.spots && Object.keys(meas.spots).length) {
+    const spots = Object.entries(meas.spots).map(([spot, r]) => {
+      const tex   = r.texture
+        ? `${SOIL_TEXTURE_NAMES[r.texture] || r.texture} <span style="color:var(--muted);">(${r.texture})</span>`
+        : "";
+      const depth = r.depth_m != null ? `${Math.round(r.depth_m * 100)} cm` : "—";
+      const frac  = [r.sand, r.silt, r.clay].every(v => v != null)
+        ? `sand ${r.sand} · silt ${r.silt} · clay ${r.clay} %` : "";
+      const carb  = [
+        r.oc != null ? `organic C ${r.oc}%` : "",
+        r.om != null ? `organic matter ${r.om}%` : "",
+      ].filter(Boolean).join(" · ");
+      return `<div class="soil-spot">
+                <b>${SOIL_SPOT_NAMES[spot] || spot}</b>
+                <span style="color:var(--muted);">· ${depth}</span>
+                ${tex  ? `<br>${tex}`  : ""}
+                ${frac ? `<br>${frac}` : ""}
+                ${carb ? `<br>${carb}` : ""}
+              </div>`;
+    }).join("");
+    soilHtml = `
+      <div class="soil-block">
+        <div class="soil-head">Soil properties <span class="soil-badge">lab-measured</span></div>
+        ${spots}
+        <div class="soil-src">
+          Measured from a soil core dug at this station and analysed in the
+          laboratory (particle size + carbon) — not a model or database value.
+          Published as ISMN static variables.
+        </div>
+      </div>`;
+  } else {
+    const parts = [];
+    if (s.sand_pct)            parts.push(`sand ${s.sand_pct}%`);
+    if (s.silt_pct)            parts.push(`silt ${s.silt_pct}%`);
+    if (s.clay_pct)            parts.push(`clay ${s.clay_pct}%`);
+    if (s.organic_carbon_pct)  parts.push(`organic C ${s.organic_carbon_pct}%`);
+    if (parts.length) soilHtml = `
+      <div class="soil-block">
+        <div class="soil-head">Soil properties <span class="soil-badge est">database estimate</span></div>
+        <div class="soil-spot">${parts.join(" · ")}</div>
+        <div class="soil-src">
+          From the Korean Soil Information System (a national database), because
+          this station has not been soil-sampled yet. Stations with a real lab
+          assay pulse <b style="color:#93c5fd;">blue</b> on the map.
+        </div>
+      </div>`;
+  }
+
+  document.getElementById("stationInfo").innerHTML = `
+    <b>${s.station_id}</b><br>
+    Lat / Lon: ${(+s.lat).toFixed(5)}, ${(+s.lon).toFixed(5)}<br>
+    Elevation: ${s.elevation_m} m<br>
+    Land cover: ${s.land_cover}<br>
+    Sensor: ${s.sensor_model}${flavorTxt}<br>
+    Depths: ${s.depths_cm} cm
+    ${soilHtml}`;
+}
+
 // =============================================================
 // On click: load timeseries CSV for that station, render panel
 // =============================================================
@@ -2603,21 +2795,7 @@ function selectStation(s) {
   if (dot) dot.classList.add("selected");
 
   // header + info
-  document.getElementById("stationLabel").textContent = `Station ID (${s.station_id})`;
-  const flavorTxt = s.sensor_flavors ? ` (${s.sensor_flavors})` : "";
-  const soilTxtParts = [];
-  if (s.clay_pct) soilTxtParts.push(`clay ${s.clay_pct}%`);
-  if (s.sand_pct) soilTxtParts.push(`sand ${s.sand_pct}%`);
-  if (s.silt_pct) soilTxtParts.push(`silt ${s.silt_pct}%`);
-  const soilTxt = soilTxtParts.length ? `<br>Soil texture: ${soilTxtParts.join(", ")}` : "";
-  document.getElementById("stationInfo").innerHTML = `
-    <b>${s.station_id}</b><br>
-    Lat / Lon: ${(+s.lat).toFixed(5)}, ${(+s.lon).toFixed(5)}<br>
-    Elevation: ${s.elevation_m} m<br>
-    Land cover: ${s.land_cover}<br>
-    Sensor: ${s.sensor_model}${flavorTxt}<br>
-    Depths: ${s.depths_cm} cm${soilTxt}
-  `;
+  renderStationInfo(s);
   document.getElementById("stationNotes").innerHTML = `
     Installed: ${s.install_date}<br>
     ${s.notes || "-"}

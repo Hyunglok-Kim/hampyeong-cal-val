@@ -1,0 +1,12 @@
+,Depth_from,Depth_to,Value
+Saturation,,,
+Clay_fraction,0.1,0.1,16.06
+Organic_carbon,0.1,0.1,1.12
+Sand_fraction,0.1,0.1,36.2
+Silt_fraction,0.1,0.1,47.74
+Landcover_classification,0.1,0.1,Redeveloped Rice Paddy
+Climate_classification,0.1,0.1,Cfa
+Climate_classification,0.1,0.1,Cfa
+Soil_texture,0.1,0.1,L
+Total_carbon,0.1,0.1,1.43
+Organic_matter,0.1,0.1,1.93
