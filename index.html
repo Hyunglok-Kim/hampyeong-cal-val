@@ -4220,15 +4220,17 @@ function _renderModelChartImpl() {
       if (!rows.length) { missing.add(`${MODEL_META[m].label} ET`); continue; }
       const sat = MODEL_META[m].retrieval;
       const nm = `${MODEL_META[m].label}${sat ? " (sat)" : " ET"}`;
-      etLines.push({
+      const tr = {
         x: rows.map(r => r.date), y: rows.map(r => +r.et_mm),
         name: nm, yaxis: "y4",
         mode: sat ? "lines+markers" : "lines",
         line: { color: MODEL_META[m].color, width: 1.8, dash: sat ? "dot" : "solid" },
-        marker: sat ? { size: 5 } : undefined,
         connectgaps: false,
         hovertemplate: `${nm}: %{y:.2f} mm/day<extra></extra>`,
-      });
+      };
+      if (sat) tr.marker = { size: 5 };   // never set marker:undefined — Plotly's
+      etLines.push(tr);                   // cleanData does `'line' in marker` and throws
+
     }
   }
 
@@ -4291,13 +4293,17 @@ function _renderModelChartImpl() {
     (showSurface ? ", vs the network mean" + (modelStations.size ? ` and ${modelStations.size} station(s)` : "") : "") +
     (missing.size ? `  ·  missing: ${[...missing].join(", ")}` : "") + ".";
 
-  const rights = [];   // right-side overlay axes, inner→outer
+  // Right-side overlay axes, inner→outer. Each entry carries its trace group so
+  // we can number the axes CONTIGUOUSLY (y2, y3, y4…) by position — a gap like
+  // y3+y4 with no y2 makes Plotly reject the whole layout (chart blanks to the
+  // fallback), so temp isn't fixed to y2 etc.; the first right axis is always y2.
+  const rights = [];
   if (showTemp && !tempOnLeft)
-    rights.push({ key: "yaxis2", title: "Soil temperature (°C)" });
+    rights.push({ title: "Soil temperature (°C)", traces: tempLines });
   if (precipTraces.length)
-    rights.push({ key: "yaxis3", title: "Precip (mm/day)", reversed: true });
+    rights.push({ title: "Precip (mm/day)", reversed: true, traces: precipTraces });
   if (etLines.length && !etOnLeft)
-    rights.push({ key: "yaxis4", title: "ET (mm/day)" });
+    rights.push({ title: "ET (mm/day)", traces: etLines });
 
   // Shrink the plot domain so N right axes have room, then position them from
   // the plot edge outward to the paper edge (1.0). Two axes → 0.90; three → 0.82.
@@ -4312,6 +4318,8 @@ function _renderModelChartImpl() {
     barmode: "overlay",
   };
   rights.forEach((r, i) => {
+    const yn = i + 2;                           // contiguous: y2, y3, y4 (no gaps)
+    r.traces.forEach(t => { t.yaxis = "y" + yn; });
     const ax = { title: { text: r.title }, overlaying: "y", side: "right",
                  showgrid: false, zeroline: false };
     if (r.reversed) ax.range = [Math.max(1, maxP) * 3, 0];
@@ -4320,7 +4328,7 @@ function _renderModelChartImpl() {
       ax.anchor = "free";
       ax.position = domRight + (1 - domRight) * (i / (nR - 1));
     }
-    layout[r.key] = ax;
+    layout["yaxis" + yn] = ax;
   });
 
   // Never let a Plotly rejection blank the chart — retry with just the SM lines.
