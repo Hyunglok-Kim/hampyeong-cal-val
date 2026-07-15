@@ -17,10 +17,13 @@ Products (EE collection → data/models/<file>.csv):
     GPM IMERG NASA/GPM_L3/IMERG_V07          11 km 30-min    ~half-day lag
              OBSERVED precipitation (not a model) — precip_mm only. The
              independent rainfall series the Models tab plots for context.
+    MOD16A2  MODIS/061/MOD16A2               500 m 8-day     ~2-week lag
+             Satellite ET RETRIEVAL (Penman-Monteith) — et_mm only. An
+             observation-based estimate; ERA5/GLDAS carry model ET too.
 
 CSV schema (daily):
-    date, sm_surface, sm_rootzone, soil_temp_c, precip_mm
-Empty fields where a model doesn't provide the variable.
+    date, sm_surface, sm_rootzone, soil_temp_c, precip_mm, et_mm
+Empty fields where a source doesn't provide the variable.
 
 Run:
     /usr/bin/python3 download_models.py --project nodal-skein-411619
@@ -48,7 +51,7 @@ ROOT = Path(__file__).parent
 OUT_DIR = ROOT / "data" / "models"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-FIELDS = ["date", "sm_surface", "sm_rootzone", "soil_temp_c", "precip_mm"]
+FIELDS = ["date", "sm_surface", "sm_rootzone", "soil_temp_c", "precip_mm", "et_mm"]
 
 
 def init_ee(project=None):
@@ -140,13 +143,16 @@ def pull_smap_l4(start, end):
 def pull_era5_land(start, end):
     print("=== ERA5-Land (ECMWF/ERA5_LAND/DAILY_AGGR, 9 km, daily) ===")
     bands = ["volumetric_soil_water_layer_1", "soil_temperature_level_1",
-             "total_precipitation_sum"]
+             "total_precipitation_sum", "total_evaporation_sum"]
     rows = get_region_rows("ECMWF/ERA5_LAND/DAILY_AGGR", bands, start, end, 11132)
     sm = daily_mean(rows, "volumetric_soil_water_layer_1")        # m³/m³, 0-7 cm
     st = daily_mean(rows, "soil_temperature_level_1", lambda k: k - 273.15)
     pr = daily_mean(rows, "total_precipitation_sum", lambda m: m * 1000)  # m → mm
+    # evaporation is stored negative (upward flux); m → mm, clamp dew (≥0)
+    et = daily_mean(rows, "total_evaporation_sum", lambda m: max(0.0, -m * 1000))
     out = {d: {"sm_surface": fmt(sm.get(d)), "sm_rootzone": "",
-               "soil_temp_c": fmt(st.get(d), 2), "precip_mm": fmt(pr.get(d), 2)}
+               "soil_temp_c": fmt(st.get(d), 2), "precip_mm": fmt(pr.get(d), 2),
+               "et_mm": fmt(et.get(d), 2)}
            for d in sm}
     n_new, n_tot = merge_write(OUT_DIR / "ERA5_LAND.csv", out)
     print(f"  {n_new} days pulled, {n_tot} total in CSV")
@@ -154,15 +160,17 @@ def pull_era5_land(start, end):
 
 def pull_gldas22(start, end):
     print("=== GLDAS-2.2 (NASA/GLDAS/V022/CLSM/G025/DA1D, 25 km, daily) ===")
-    bands = ["SoilMoist_S_tavg", "SoilMoist_RZ_tavg", "AvgSurfT_tavg"]
+    bands = ["SoilMoist_S_tavg", "SoilMoist_RZ_tavg", "AvgSurfT_tavg", "Evap_tavg"]
     rows = get_region_rows("NASA/GLDAS/V022/CLSM/G025/DA1D", bands, start, end, 27830)
     # CLSM surface-excess SM is kg/m² over the top 2 cm → ÷(1000·0.02)=÷20
     # for m³/m³; root zone is kg/m² over the top 1 m → ÷1000.
     sm = daily_mean(rows, "SoilMoist_S_tavg", lambda kg: kg / 20.0)
     rz = daily_mean(rows, "SoilMoist_RZ_tavg", lambda kg: kg / 1000.0)
     st = daily_mean(rows, "AvgSurfT_tavg", lambda k: k - 273.15)
+    et = daily_mean(rows, "Evap_tavg", lambda f: f * 86400.0)     # kg/m²/s → mm/day
     out = {d: {"sm_surface": fmt(sm.get(d)), "sm_rootzone": fmt(rz.get(d)),
-               "soil_temp_c": fmt(st.get(d), 2), "precip_mm": ""}
+               "soil_temp_c": fmt(st.get(d), 2), "precip_mm": "",
+               "et_mm": fmt(et.get(d), 2)}
            for d in sm}
     n_new, n_tot = merge_write(OUT_DIR / "GLDAS22.csv", out)
     print(f"  {n_new} days pulled, {n_tot} total in CSV")
@@ -193,11 +201,32 @@ def pull_gpm_imerg(start, end):
     print(f"  {n_new} days pulled, {n_tot} total in CSV")
 
 
+def pull_mod16a2(start, end):
+    print("=== MODIS MOD16A2 ET (MODIS/061/MOD16A2, 500 m, 8-day) ===")
+    # Satellite ET RETRIEVAL (Penman-Monteith on MODIS + reanalysis met) — an
+    # observation-based ESTIMATE, not a direct measurement. `ET` is the 8-day
+    # total, scale 0.1 (→ kg/m²/8day = mm/8day); values >32760 are fill.
+    rows = get_region_rows("MODIS/061/MOD16A2", ["ET"], start, end, 500)
+    et = {}
+    for r in rows:
+        v = r.get("ET")
+        if v is None or v > 32760:
+            continue
+        d = dt.datetime.utcfromtimestamp(r["time_ms"] / 1000).strftime("%Y-%m-%d")
+        et[d] = v * 0.1 / 8.0            # scaled mm/8day → mm/day rate
+    out = {d: {"sm_surface": "", "sm_rootzone": "", "soil_temp_c": "",
+               "precip_mm": "", "et_mm": fmt(v, 2)}
+           for d, v in et.items()}
+    n_new, n_tot = merge_write(OUT_DIR / "MOD16A2.csv", out)
+    print(f"  {n_new} days pulled, {n_tot} total in CSV")
+
+
 PULLS = {
     "smap":  pull_smap_l4,
     "era5":  pull_era5_land,
     "gldas": pull_gldas22,
     "gpm":   pull_gpm_imerg,
+    "mod16": pull_mod16a2,
 }
 
 

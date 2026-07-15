@@ -466,9 +466,21 @@ AI prediction · Visitor History · **About Data** · Support.
   chunked like SMAP). In `MODEL_META` it carries `obs:true`: its precip bars
   render darker (opacity 0.7 vs 0.35) and the SM/temp/skill loops skip it, so
   it never shows an empty soil-moisture line or a bogus "missing" note.
+  **Evapotranspiration (`et_mm`)**: ERA5-Land (`total_evaporation_sum`, m→mm,
+  evap is negative) and GLDAS (`Evap_tavg`, kg/m²/s×86400) carry MODEL ET;
+  **MOD16A2** (`MODIS/061/MOD16A2`, 500 m, 8-day, `ET`×0.1/8, fill >32760) is a
+  SATELLITE ET RETRIEVAL — its own precip-less/SM-less source, dotted + "(sat)"
+  in the chart. ET gets its own right axis (mm/day).
   Refresh (`--only` selects a subset; default = all):
-  `/usr/bin/python3 download_models.py --project nodal-skein-411619 --only gpm --start <last>`
+  `/usr/bin/python3 download_models.py --project nodal-skein-411619 --only gpm,era5,gldas,mod16 --start <last>`
   then commit — the CSV writer merges by date, so incremental runs are safe.
+
+  Each source declares `has:[...]` in `MODEL_META` (which columns it carries);
+  every variable loop skips sources without that column (so GPM/MODIS never
+  draw an empty SM line or a false "missing" note). Right axes are built
+  generically: `rights[]` (temp y2 / precip y3 / ET y4) positioned inner→outer
+  with `xaxis.domain` shrunk to 0.90 (2 axes) or 0.82 (3). The left axis takes
+  the first available of SM → temp → ET.
   Variables: surface SM, root-zone SM, soil temp, precip (radio). Not every
   model has every variable — ERA5-Land has no root-zone column, GLDAS has
   no precip; the UI notes these instead of drawing a flat-zero line (empty

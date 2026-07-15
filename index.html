@@ -1950,6 +1950,8 @@
             GLDAS-2.2 <span style="color:var(--muted);font-size:11px;">25 km · daily · months lag</span></label>
           <label><input type="checkbox" data-model="GPM_IMERG" checked>
             <b>GPM IMERG</b> <span style="color:var(--muted);font-size:11px;">11 km · observed rain · precip only</span></label>
+          <label><input type="checkbox" data-model="MOD16A2">
+            <b>MODIS ET</b> <span style="color:var(--muted);font-size:11px;">500 m · 8-day · satellite ET estimate · ET only</span></label>
           <label><input type="checkbox" id="modelShowInsitu" checked>
             <b>In-situ network mean</b> <span style="color:var(--muted);font-size:11px;">47 stations · reference</span></label>
         </div>
@@ -1958,6 +1960,7 @@
           <label><input type="checkbox" name="modelVar" value="sm_surface" checked> Surface soil moisture <span style="color:var(--muted);font-size:11px;">m³/m³ · left</span></label>
           <label><input type="checkbox" name="modelVar" value="sm_rootzone"> Root-zone soil moisture <span style="color:var(--muted);font-size:11px;">m³/m³ · left</span></label>
           <label><input type="checkbox" name="modelVar" value="soil_temp_c"> Soil temperature <span style="color:var(--muted);font-size:11px;">°C · right</span></label>
+          <label><input type="checkbox" name="modelVar" value="et_mm"> Evapotranspiration <span style="color:var(--muted);font-size:11px;">mm/day · right · MODIS + models</span></label>
           <label style="margin-top:6px;border-top:1px solid var(--border-dark);padding-top:6px;">
             <input type="checkbox" id="modelShowPrecip" checked>
             Precipitation <span style="color:var(--muted);font-size:11px;">mm/day · right · bars</span></label>
@@ -3986,20 +3989,28 @@ function renderAboutStats() {
 // CSVs are tiny (one row per day, written by download_models.py); they're
 // lazy-fetched on first tab open and cached for the session.
 // =============================================================
+// `has` = which CSV columns each source actually carries, so a variable loop
+// silently skips sources that structurally lack it (no bogus "missing" note).
+// `obs` = observed (GPM precip); `retrieval` = satellite estimate (MODIS ET) —
+// both are styled distinctly from the pure-model series.
 const MODEL_META = {
-  SMAP_L4:   { label: "SMAP L4",   color: "#1d4ed8" },
-  ERA5_LAND: { label: "ERA5-Land", color: "#b45309" },
-  GLDAS22:   { label: "GLDAS-2.2", color: "#7c3aed" },
-  // Observed precipitation (not a model) — precip_mm only, so it never draws a
-  // soil-moisture/temperature line. `obs` makes its precip bars stand out from
-  // the models' faint modelled precip.
-  GPM_IMERG: { label: "GPM IMERG", color: "#0e7490", obs: true },
+  SMAP_L4:   { label: "SMAP L4",   color: "#1d4ed8",
+               has: ["sm_surface", "sm_rootzone", "soil_temp_c", "precip_mm"] },
+  ERA5_LAND: { label: "ERA5-Land", color: "#b45309",
+               has: ["sm_surface", "soil_temp_c", "precip_mm", "et_mm"] },
+  GLDAS22:   { label: "GLDAS-2.2", color: "#7c3aed",
+               has: ["sm_surface", "sm_rootzone", "soil_temp_c", "et_mm"] },
+  GPM_IMERG: { label: "GPM IMERG", color: "#0e7490", obs: true,
+               has: ["precip_mm"] },
+  MOD16A2:   { label: "MODIS ET",  color: "#15803d", retrieval: true,
+               has: ["et_mm"] },
 };
 const MODEL_VAR_INFO = {
   sm_surface:  { title: "Surface soil moisture",   unit: "m³/m³", kind: "line" },
   sm_rootzone: { title: "Root-zone soil moisture", unit: "m³/m³", kind: "line" },
   soil_temp_c: { title: "Soil temperature",        unit: "°C",    kind: "line" },
   precip_mm:   { title: "Precipitation",           unit: "mm/day", kind: "bar" },
+  et_mm:       { title: "Evapotranspiration",      unit: "mm/day", kind: "line" },
 };
 let _modelData = null;      // { SMAP_L4: rows[], ... }
 let _modelsLoading = false;
@@ -4169,7 +4180,7 @@ function _renderModelChartImpl() {
   // root-zone is dashed so it's distinguishable from surface at the same color.
   for (const sv of smVars) {
     for (const m of _modelChecked()) {
-      if (MODEL_META[m].obs) continue;   // precip-only source — no SM series
+      if (!MODEL_META[m].has.includes(sv.key)) continue;   // source lacks this var
       const rows = (_modelData[m] || []).filter(r => modelNum(r[sv.key]) !== null);
       if (!rows.length) { missing.add(`${MODEL_META[m].label} ${sv.label}`); continue; }
       lines.push({
@@ -4185,7 +4196,7 @@ function _renderModelChartImpl() {
   const tempLines = [];
   if (showTemp) {
     for (const m of _modelChecked()) {
-      if (MODEL_META[m].obs) continue;   // precip-only source — no temp series
+      if (!MODEL_META[m].has.includes("soil_temp_c")) continue;
       const rows = (_modelData[m] || []).filter(r => modelNum(r.soil_temp_c) !== null);
       if (!rows.length) { missing.add(`${MODEL_META[m].label} temp`); continue; }
       tempLines.push({
@@ -4194,6 +4205,29 @@ function _renderModelChartImpl() {
         mode: "lines", line: { color: MODEL_META[m].color, width: 1.4, dash: "dashdot" },
         connectgaps: false,
         hovertemplate: `${MODEL_META[m].label}: %{y:.1f} °C<extra></extra>`,
+      });
+    }
+  }
+
+  // Evapotranspiration series (own right axis, mm/day). Satellite retrievals
+  // (MODIS) are dotted + labelled "(sat)" to set them apart from model ET.
+  const showET = vars.includes("et_mm");
+  const etLines = [];
+  if (showET) {
+    for (const m of _modelChecked()) {
+      if (!MODEL_META[m].has.includes("et_mm")) continue;
+      const rows = (_modelData[m] || []).filter(r => modelNum(r.et_mm) !== null);
+      if (!rows.length) { missing.add(`${MODEL_META[m].label} ET`); continue; }
+      const sat = MODEL_META[m].retrieval;
+      const nm = `${MODEL_META[m].label}${sat ? " (sat)" : " ET"}`;
+      etLines.push({
+        x: rows.map(r => r.date), y: rows.map(r => +r.et_mm),
+        name: nm, yaxis: "y4",
+        mode: sat ? "lines+markers" : "lines",
+        line: { color: MODEL_META[m].color, width: 1.8, dash: sat ? "dot" : "solid" },
+        marker: sat ? { size: 5 } : undefined,
+        connectgaps: false,
+        hovertemplate: `${nm}: %{y:.2f} mm/day<extra></extra>`,
       });
     }
   }
@@ -4220,7 +4254,7 @@ function _renderModelChartImpl() {
     }
   }
 
-  const primary = [...lines, ...tempLines];   // everything that counts as content
+  const primary = [...lines, ...tempLines, ...etLines];   // everything that counts as content
   const el = document.getElementById("modelChart");
   if (!primary.length) {
     Plotly.purge(el);
@@ -4234,34 +4268,44 @@ function _renderModelChartImpl() {
   // desyncs react's internal state and silently blanks the div).
   if (el.querySelector(".chart-msg")) el.innerHTML = "";
 
-  // Bars behind lines: band → precip → SM/station lines → temp lines.
-  const traces = [...band, ...precipTraces, ...lines, ...tempLines];
+  // ---- axes: the left axis holds the primary line variable (SM > temp > ET);
+  // everything else stacks on right overlay axes (inner→outer). ----
+  const tempOnLeft = showTemp && !smVars.length;
+  const etOnLeft   = showET && !smVars.length && !showTemp;
+  if (tempOnLeft) tempLines.forEach(t => { delete t.yaxis; });   // → left 'y'
+  if (etOnLeft)   etLines.forEach(t => { delete t.yaxis; });     // → left 'y'
+  const leftTitle = smVars.length ? "Soil moisture (m³/m³)"
+                  : tempOnLeft ? "Soil temperature (°C)"
+                  : etOnLeft ? "ET (mm/day)" : "";
+
+  // Bars behind lines: band → precip → SM/station lines → temp → ET.
+  const traces = [...band, ...precipTraces, ...lines, ...tempLines, ...etLines];
 
   const parts = [];
   if (smVars.length) parts.push(smVars.map(v => v.label).join(" + ") + " soil moisture");
   if (showTemp) parts.push("soil temperature");
   if (precipTraces.length) parts.push("precipitation");
+  if (etLines.length) parts.push("evapotranspiration");
   document.getElementById("modelChartSubtitle").innerHTML =
     `Daily <b>${parts.join(", ")}</b> at the site pixel` +
     (showSurface ? ", vs the network mean" + (modelStations.size ? ` and ${modelStations.size} station(s)` : "") : "") +
     (missing.size ? `  ·  missing: ${[...missing].join(", ")}` : "") + ".";
-
-  // ---- axes: left = soil moisture; up to two right axes (temp, precip) ----
-  const leftTitle = smVars.length ? "Soil moisture (m³/m³)"
-                  : (showTemp ? "Soil temperature (°C)" : "");
-  // If temp is the only content, it lives on the LEFT; otherwise on y2 (right).
-  const tempOnLeft = showTemp && !smVars.length;
-  if (tempOnLeft) tempLines.forEach(t => { delete t.yaxis; });   // → left 'y'
 
   const rights = [];   // right-side overlay axes, inner→outer
   if (showTemp && !tempOnLeft)
     rights.push({ key: "yaxis2", title: "Soil temperature (°C)" });
   if (precipTraces.length)
     rights.push({ key: "yaxis3", title: "Precip (mm/day)", reversed: true });
+  if (etLines.length && !etOnLeft)
+    rights.push({ key: "yaxis4", title: "ET (mm/day)" });
 
+  // Shrink the plot domain so N right axes have room, then position them from
+  // the plot edge outward to the paper edge (1.0). Two axes → 0.90; three → 0.82.
+  const nR = rights.length;
+  const domRight = nR <= 1 ? 1 : (nR === 2 ? 0.90 : 0.82);
   const layout = {
-    margin: { l: 55, r: rights.length ? 55 : 15, t: 10, b: 40 },
-    xaxis: { type: "date", domain: [0, rights.length >= 2 ? 0.9 : 1] },
+    margin: { l: 55, r: nR >= 3 ? 72 : (nR ? 55 : 15), t: 10, b: 40 },
+    xaxis: { type: "date", domain: [0, domRight] },
     yaxis: { title: { text: leftTitle } },
     legend: { orientation: "h", y: -0.18 },
     hovermode: "x unified",
@@ -4271,8 +4315,11 @@ function _renderModelChartImpl() {
     const ax = { title: { text: r.title }, overlaying: "y", side: "right",
                  showgrid: false, zeroline: false };
     if (r.reversed) ax.range = [Math.max(1, maxP) * 3, 0];
-    if (i === 0) ax.anchor = "x";              // sits at the plot's right edge
-    else { ax.anchor = "free"; ax.position = 1.0; }
+    if (i === 0) ax.anchor = "x";              // inner: at the plot's right edge
+    else {                                     // outer: step from edge → paper 1.0
+      ax.anchor = "free";
+      ax.position = domRight + (1 - domRight) * (i / (nR - 1));
+    }
     layout[r.key] = ax;
   });
 
@@ -4325,7 +4372,7 @@ function renderModelMetrics() {
 
   const lines = [];
   for (const m of _modelChecked()) {
-    if (MODEL_META[m].obs) continue;   // precip-only source — no SM skill
+    if (!MODEL_META[m].has.includes("sm_surface")) continue;   // no surface SM
     const rows = (_modelData[m] || []).filter(r => modelNum(r.sm_surface) !== null);
     const vsMean = _pairStats(rows.filter(r => meanByDate.has(r.date))
       .map(r => [+r.sm_surface, meanByDate.get(r.date)]));
