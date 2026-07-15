@@ -14,6 +14,9 @@ Products (EE collection → data/models/<file>.csv):
     ERA5-Land ECMWF/ERA5_LAND/DAILY_AGGR     9 km  daily     ~1 week lag
     GLDAS-2.2 NASA/GLDAS/V022/CLSM/G025/DA1D 25 km daily     months lag
              (kept for reference; refresh picks up whatever is new)
+    GPM IMERG NASA/GPM_L3/IMERG_V07          11 km 30-min    ~half-day lag
+             OBSERVED precipitation (not a model) — precip_mm only. The
+             independent rainfall series the Models tab plots for context.
 
 CSV schema (daily):
     date, sm_surface, sm_rootzone, soil_temp_c, precip_mm
@@ -165,19 +168,59 @@ def pull_gldas22(start, end):
     print(f"  {n_new} days pulled, {n_tot} total in CSV")
 
 
+def pull_gpm_imerg(start, end):
+    print("=== GPM IMERG V07 (NASA/GPM_L3/IMERG_V07, 0.1°, 30-min) ===")
+    # OBSERVED precipitation (satellite/gauge merge) — independent of the
+    # models' own precip. `precipitation` is the calibrated rate in mm/hr.
+    bands = ["precipitation"]
+    # 48 half-hourly steps/day → chunk like SMAP so getRegion stays in memory.
+    rows = []
+    d0 = dt.date.fromisoformat(start)
+    d_end = dt.date.fromisoformat(end)
+    while d0 < d_end:
+        d1 = min(d0 + dt.timedelta(days=60), d_end)
+        rows.extend(get_region_rows("NASA/GPM_L3/IMERG_V07", bands,
+                                    d0.isoformat(), d1.isoformat(), 11132))
+        d0 = d1
+    # daily total mm = mean rate (mm/hr, clamped ≥0) × 24 h. Mean×24 (rather
+    # than a raw sum) is robust to the odd missing half-hour. UTC days, same
+    # as the model pulls above.
+    pr_rate = daily_mean(rows, "precipitation", lambda r: max(r, 0.0))
+    out = {d: {"sm_surface": "", "sm_rootzone": "", "soil_temp_c": "",
+               "precip_mm": fmt(rate * 24.0, 2)}
+           for d, rate in pr_rate.items()}
+    n_new, n_tot = merge_write(OUT_DIR / "GPM_IMERG.csv", out)
+    print(f"  {n_new} days pulled, {n_tot} total in CSV")
+
+
+PULLS = {
+    "smap":  pull_smap_l4,
+    "era5":  pull_era5_land,
+    "gldas": pull_gldas22,
+    "gpm":   pull_gpm_imerg,
+}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--start", default="2025-06-01", help="ISO date (inclusive)")
     ap.add_argument("--end", default=None, help="ISO date (exclusive); default = tomorrow")
     ap.add_argument("--project", default=None)
+    ap.add_argument("--only", default=None,
+                    help="comma-separated subset of: " + ",".join(PULLS))
     args = ap.parse_args()
     end = args.end or (dt.date.today() + dt.timedelta(days=1)).isoformat()
 
+    which = [k.strip() for k in args.only.split(",")] if args.only else list(PULLS)
+    bad = [k for k in which if k not in PULLS]
+    if bad:
+        sys.exit(f"unknown --only key(s): {bad}; valid: {list(PULLS)}")
+
     init_ee(args.project)
     print(f"site point: {SITE_LAT:.5f} N, {SITE_LON:.5f} E   window: {args.start} .. {end}")
-    for fn in (pull_smap_l4, pull_era5_land, pull_gldas22):
+    for k in which:
         try:
-            fn(args.start, end)
+            PULLS[k](args.start, end)
         except Exception as ex:
             print(f"  FAILED: {ex}")
     print("\nDone. CSVs in data/models/ — commit + push to publish.")

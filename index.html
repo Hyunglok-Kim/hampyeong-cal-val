@@ -1948,6 +1948,8 @@
             ERA5-Land <span style="color:var(--muted);font-size:11px;">9 km · daily · ~1-week lag</span></label>
           <label><input type="checkbox" data-model="GLDAS22">
             GLDAS-2.2 <span style="color:var(--muted);font-size:11px;">25 km · daily · months lag</span></label>
+          <label><input type="checkbox" data-model="GPM_IMERG" checked>
+            <b>GPM IMERG</b> <span style="color:var(--muted);font-size:11px;">11 km · observed rain · precip only</span></label>
           <label><input type="checkbox" id="modelShowInsitu" checked>
             <b>In-situ network mean</b> <span style="color:var(--muted);font-size:11px;">47 stations · reference</span></label>
         </div>
@@ -3988,6 +3990,10 @@ const MODEL_META = {
   SMAP_L4:   { label: "SMAP L4",   color: "#1d4ed8" },
   ERA5_LAND: { label: "ERA5-Land", color: "#b45309" },
   GLDAS22:   { label: "GLDAS-2.2", color: "#7c3aed" },
+  // Observed precipitation (not a model) — precip_mm only, so it never draws a
+  // soil-moisture/temperature line. `obs` makes its precip bars stand out from
+  // the models' faint modelled precip.
+  GPM_IMERG: { label: "GPM IMERG", color: "#0e7490", obs: true },
 };
 const MODEL_VAR_INFO = {
   sm_surface:  { title: "Surface soil moisture",   unit: "m³/m³", kind: "line" },
@@ -4163,6 +4169,7 @@ function _renderModelChartImpl() {
   // root-zone is dashed so it's distinguishable from surface at the same color.
   for (const sv of smVars) {
     for (const m of _modelChecked()) {
+      if (MODEL_META[m].obs) continue;   // precip-only source — no SM series
       const rows = (_modelData[m] || []).filter(r => modelNum(r[sv.key]) !== null);
       if (!rows.length) { missing.add(`${MODEL_META[m].label} ${sv.label}`); continue; }
       lines.push({
@@ -4178,6 +4185,7 @@ function _renderModelChartImpl() {
   const tempLines = [];
   if (showTemp) {
     for (const m of _modelChecked()) {
+      if (MODEL_META[m].obs) continue;   // precip-only source — no temp series
       const rows = (_modelData[m] || []).filter(r => modelNum(r.soil_temp_c) !== null);
       if (!rows.length) { missing.add(`${MODEL_META[m].label} temp`); continue; }
       tempLines.push({
@@ -4200,12 +4208,14 @@ function _renderModelChartImpl() {
       if (!rows.length) continue;
       const yy = rows.map(r => +r.precip_mm);
       maxP = Math.max(maxP, ...yy);
+      const obs = MODEL_META[m].obs;
+      const nm = `${MODEL_META[m].label}${obs ? " (obs)" : ""} precip`;
       precipTraces.push({
         x: rows.map(r => r.date), y: yy,
-        name: `${MODEL_META[m].label} precip`,
+        name: nm,
         type: "bar", yaxis: "y3",
-        marker: { color: MODEL_META[m].color, opacity: 0.4 },
-        hovertemplate: `${MODEL_META[m].label}: %{y:.1f} mm<extra></extra>`,
+        marker: { color: MODEL_META[m].color, opacity: obs ? 0.7 : 0.35 },
+        hovertemplate: `${nm}: %{y:.1f} mm<extra></extra>`,
       });
     }
   }
@@ -4315,6 +4325,7 @@ function renderModelMetrics() {
 
   const lines = [];
   for (const m of _modelChecked()) {
+    if (MODEL_META[m].obs) continue;   // precip-only source — no SM skill
     const rows = (_modelData[m] || []).filter(r => modelNum(r.sm_surface) !== null);
     const vsMean = _pairStats(rows.filter(r => meanByDate.has(r.date))
       .map(r => [+r.sm_surface, meanByDate.get(r.date)]));

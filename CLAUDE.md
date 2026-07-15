@@ -460,8 +460,14 @@ AI prediction · Visitor History · **About Data** · Support.
   `data/models/` written by `download_models.py` (SMAP L4 9 km ~4-day lag,
   ERA5-Land 9 km ~1-week lag, GLDAS-2.2 25 km months lag — all via EE
   `getRegion` point extraction at the site center; SMAP pulled in 60-day
-  chunks to stay under EE's memory limit). Refresh:
-  `/usr/bin/python3 download_models.py --project nodal-skein-411619 --start <last>`
+  chunks to stay under EE's memory limit). **GPM IMERG V07** (11 km, 30-min,
+  ~half-day lag) is also pulled here but is **OBSERVED precipitation, not a
+  model** — `precip_mm` only, half-hourly rate → daily total (mean mm/hr ×24,
+  chunked like SMAP). In `MODEL_META` it carries `obs:true`: its precip bars
+  render darker (opacity 0.7 vs 0.35) and the SM/temp/skill loops skip it, so
+  it never shows an empty soil-moisture line or a bogus "missing" note.
+  Refresh (`--only` selects a subset; default = all):
+  `/usr/bin/python3 download_models.py --project nodal-skein-411619 --only gpm --start <last>`
   then commit — the CSV writer merges by date, so incremental runs are safe.
   Variables: surface SM, root-zone SM, soil temp, precip (radio). Not every
   model has every variable — ERA5-Land has no root-zone column, GLDAS has
