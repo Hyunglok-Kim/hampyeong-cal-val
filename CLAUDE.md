@@ -441,8 +441,15 @@ render as a crisp grid. The "interpolate" checkbox toggles this class off.
 ## Tabs
 
 Tab bar order: In-situ (default active) · UAVs · Satellites · Models ·
-AI prediction · Visitor History · **About Data** · Support.
+AI prediction · Visitor History · **About Data** · **Team** · Support.
 
+- **Team** — acknowledgement page for the students running the field work
+  (`#teamMainCol`, full-width single column via `.layout.team-mode`; map
+  hidden, no side panel). Cards: Mr. Jaegyun (UAV observation lead),
+  Mr. Namhoon (UAV observation support), Mr. Kunhee (sensor installation &
+  maintenance, whole network). Photos: `photos/team/*.jpg` — 360×360 square
+  crops made from the originals kept in the Insync website folder
+  (`…/website/photos/team/`). Add a card + photo when a student joins.
 - **About Data** — first-time-visitor explainer of everything the site
   collects (site geometry, in-situ network, UAV payloads, satellite product
   table, basemaps, data-flow, access policy). Swaps the map column for a

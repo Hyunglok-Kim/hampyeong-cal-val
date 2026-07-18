@@ -1189,6 +1189,46 @@
 .about-table th, .about-table td { border: 1px solid var(--border, #ddd); padding: 6px 9px; text-align: left; vertical-align: top; }
 .about-table th { background: rgba(31,111,204,.08); }
 
+/* Team tab — acknowledgement cards for the students who run the site's
+   field work. Full-width single column (map hidden), like About Data. */
+.layout.team-mode { grid-template-columns: 1fr; }
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 300px));
+  gap: 18px;
+  justify-content: center;
+  margin: 18px 0 8px;
+}
+.team-card {
+  background: #fff;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 12px;
+  padding: 22px 18px 18px;
+  text-align: center;
+  box-shadow: 0 1px 6px rgba(15,23,42,0.06);
+}
+.team-card img {
+  width: 148px; height: 148px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid rgba(31,111,204,.25);
+  display: block;
+  margin: 0 auto 12px;
+}
+.team-name { font-size: 16px; font-weight: 700; color: var(--text, #0f172a); }
+.team-role {
+  display: inline-block;
+  margin: 6px 0 10px;
+  font-size: 11.5px; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase;
+  color: #1f6fcc;
+  background: rgba(31,111,204,.10);
+  border: 1px solid rgba(31,111,204,.30);
+  border-radius: 12px;
+  padding: 3px 10px;
+}
+.team-desc { font-size: 13px; line-height: 1.6; color: #475569; text-align: left; }
+
 /* Boot overlay — painted with the first HTML bytes, dismissed by
    dismissBootOverlay() once stations are on the map (or by its own
    15 s safety timer if anything upstream fails). */
@@ -1254,6 +1294,7 @@
            subsequent visits keep it visible. -->
       <button class="tab" data-tab="analytics" id="tabAnalytics" style="display:none;">Analytics</button>
       <button class="tab" data-tab="about">About Data</button>
+      <button class="tab" data-tab="team">Team</button>
       <button class="tab tab-support" data-tab="support" title="Help us extend the cal/val site">♥ Support</button>
     </div>
     <div class="credit">
@@ -1430,6 +1471,61 @@
           Operated by the <b>HydroAI Lab, GIST</b> in partnership with
           NASA JPL and NASA GSFC. If you use these data in a publication,
           please contact us for the correct citation.
+        </p>
+      </article>
+    </div>
+
+    <!-- Team — acknowledgement page for the students who run the field
+         work (map hidden while active, like About Data). -->
+    <div class="map-col" id="teamMainCol" style="display:none;">
+      <article class="about-article" style="max-width:1000px;">
+        <h2>Field Team</h2>
+        <p class="about-lead">
+          Every number on this site starts as someone's field day. The
+          Hampyeong cal/val site is operated by graduate students of the
+          <b>HydroAI Lab, GIST</b> — they install and service the sensors,
+          fly the UAV campaigns, and carry the data home. We gratefully
+          acknowledge them here.
+        </p>
+
+        <div class="team-grid">
+          <div class="team-card">
+            <img src="photos/team/jaegyun.jpg" alt="Mr. Jaegyun">
+            <div class="team-name">Mr. Jaegyun</div>
+            <div class="team-role">UAV Observation — Lead</div>
+            <div class="team-desc">
+              Leads the UAV campaigns: flight planning and piloting of the
+              multispectral / thermal, LiDAR, and PolRA L-band radiometer
+              payloads that map the full 1-km cell at 1-m resolution,
+              roughly every 1–2 weeks in season.
+            </div>
+          </div>
+          <div class="team-card">
+            <img src="photos/team/namhoon.jpg" alt="Mr. Namhoon">
+            <div class="team-name">Mr. Namhoon</div>
+            <div class="team-role">UAV Observation — Support</div>
+            <div class="team-desc">
+              Co-runs the UAV campaigns: ground control, payload checks,
+              and post-flight data transfer — the second pair of hands
+              every safe, complete flight day depends on.
+            </div>
+          </div>
+          <div class="team-card">
+            <img src="photos/team/kunhee.jpg" alt="Mr. Kunhee">
+            <div class="team-name">Mr. Kunhee</div>
+            <div class="team-role">Sensor Installation &amp; Maintenance</div>
+            <div class="team-desc">
+              Responsible for the entire in-situ network: installing,
+              calibrating, and servicing the 47 stations and 82 soil
+              sensors across paddies, fields, and forest — the ground
+              truth everything else on this site is judged against.
+            </div>
+          </div>
+        </div>
+
+        <p class="about-foot">
+          HydroAI Lab, GIST — PI: Prof. Hyunglok Kim. Field photos from
+          campaigns appear in the Visitor History tab.
         </p>
       </article>
     </div>
@@ -3923,19 +4019,23 @@ document.querySelectorAll(".tab").forEach(btn => {
       const sp = document.getElementById(`side-${name}`);
       if (sp) sp.style.display = (name === t) ? "" : "none";
     });
-    // Pictures, About Data and Models swap the leaflet map column for their
-    // own main column; every other tab keeps the map visible.
+    // Pictures, About Data, Models and Team swap the leaflet map column for
+    // their own main column; every other tab keeps the map visible.
     const showPic   = (t === "pic");
     const showAbout = (t === "about");
     const showModel = (t === "model");
-    document.getElementById("mapCol").style.display      = (showPic || showAbout || showModel) ? "none" : "";
+    const showTeam  = (t === "team");
+    document.getElementById("mapCol").style.display      = (showPic || showAbout || showModel || showTeam) ? "none" : "";
     document.getElementById("picMainCol").style.display   = showPic   ? "" : "none";
     document.getElementById("aboutMainCol").style.display = showAbout ? "" : "none";
     document.getElementById("modelMainCol").style.display = showModel ? "" : "none";
-    // Models uses a full-width top chart + controls-below layout.
+    document.getElementById("teamMainCol").style.display  = showTeam  ? "" : "none";
+    // Models uses a full-width top chart + controls-below layout; Team is a
+    // single full-width column (no side panel).
     document.getElementById("view-insitu").classList.toggle("models-mode", showModel);
+    document.getElementById("view-insitu").classList.toggle("team-mode", showTeam);
 
-    if (!showPic && !showAbout && !showModel) {
+    if (!showPic && !showAbout && !showModel && !showTeam) {
       map.invalidateSize();                            // map div size may have changed
     }
     if (t === "about") {
