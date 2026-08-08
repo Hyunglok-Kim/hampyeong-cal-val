@@ -6,22 +6,23 @@ Stack is pure static: Leaflet + Plotly + PapaParse, no backend.
 
 ## ⚠️ Where to edit (read this before changing anything)
 
-The portal exists in **two parallel locations on disk**, and only one of
-them deploys:
+**`/Users/hyunglokkim/orca/projects/hampyeong-cal-val/`** — the only copy.
+Git checkout of `github.com/Hyunglok-Kim/hampyeong-cal-val.git`; **pushes to
+`main` auto-deploy** (GitHub Pages → Webflow iframe).
 
-| Path | Role |
-|---|---|
-| **`/Users/hyunglokkim/Code/hampyeong_data_portal/`** | git checkout of `github.com/Hyunglok-Kim/hampyeong-cal-val.git`. **Pushes to `main` auto-deploy** (GitHub Pages → Webflow iframe). **Edit here.** |
-| `~/Insync/hkim@geol.sc.edu/Google Drive/website/hampyeong_data_portal/` | Google Drive mirror via Insync. Backup only — Insync **does not** push to git, so changes here never reach the live site. |
-
-If you're prompted into a Claude/terminal session whose CWD is the Insync
-folder, `cd /Users/hyunglokkim/Code/hampyeong_data_portal` first. Sync any
-in-flight Insync edits over to Code/, then commit + push from Code/.
+History (2026-08-08 consolidation): the checkout used to live at
+`~/Code/hampyeong_data_portal/` with a stale Insync/Google Drive mirror at
+`~/Insync/hkim@geol.sc.edu/Google Drive/website/hampyeong_data_portal/`.
+Both were retired — everything moved here, deliberately **outside** any
+cloud-sync folder (Insync clobbered files mid-run; see Known gotchas).
+Design/source assets that lived next to the old mirror (partner logos,
+web_design.pptx, KMZ, photo originals) are in
+`~/orca/projects/hampyeong-portal-assets/`.
 
 ## Quick start
 
 ```bash
-cd /Users/hyunglokkim/Code/hampyeong_data_portal
+cd /Users/hyunglokkim/orca/projects/hampyeong-cal-val
 python3 -m http.server 8765
 # open http://localhost:8765/index.html
 ```
@@ -35,7 +36,7 @@ GitHub Pages is enabled on `main`. Push and the live site updates within
 ~1 min; Webflow then pulls via iframe.
 
 ```bash
-cd /Users/hyunglokkim/Code/hampyeong_data_portal
+cd /Users/hyunglokkim/orca/projects/hampyeong-cal-val
 git add -A
 git commit -m "..."
 git push origin main
@@ -448,8 +449,9 @@ AI prediction · Visitor History · **About Data** · **Team** · Support.
   hidden, no side panel). Cards: Mr. Jaegyun (UAV observation lead),
   Mr. Namhoon (UAV observation support), Mr. Kunhee (sensor installation &
   maintenance, whole network). Photos: `photos/team/*.jpg` — 360×360 square
-  crops made from the originals kept in the Insync website folder
-  (`…/website/photos/team/`). Add a card + photo when a student joins.
+  crops made from the originals kept in
+  `~/orca/projects/hampyeong-portal-assets/photos/team/`. Add a card +
+  photo when a student joins.
 - **About Data** — first-time-visitor explainer of everything the site
   collects (site geometry, in-situ network, UAV payloads, satellite product
   table, basemaps, data-flow, access policy). Swaps the map column for a
@@ -537,8 +539,8 @@ the iframe (see `c05fc88` for context).
 
 - **Insync / Google Drive sync** can clobber files written rapidly by Python
   (this hit us during MODIS download — half the NDVI files vanished mid-run).
-  Per-product subfolders helped. If you see catalog row count ≠ files on disk
-  after a download, suspect Insync.
+  This is why the repo now lives under `~/orca/projects/` instead of any
+  cloud-synced folder — keep it that way.
 - **PIL + EE GeoTIFF**: PIL reads EE-served GeoTIFFs as wrong dtype, producing
   garbage like `4e-35`. Always use `format='NPY'` from `getDownloadURL`.
 - **System Python only**: scripts use `/usr/bin/python3` (3.9). Earth Engine
