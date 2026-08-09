@@ -10,37 +10,57 @@
 <link rel="preconnect" href="https://unpkg.com" crossorigin />
 <link rel="preconnect" href="https://cdn.plot.ly" crossorigin />
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<!-- Claude-style type pairing: Source Serif 4 (display, ≈Tiempos) +
+     Archivo (UI, ≈Styrene). font-display:swap keeps first paint instant. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=Archivo:wght@400;500;600;700&display=swap" />
 
 <style>
   :root {
-    --bg: #f6f7f9;             /* page background, very subtle cool gray */
+    /* Claude / Anthropic-inspired warm-light system: ivory page, bone
+       panels, warm ink, terracotta accent. The old dark-slate panel theme
+       is gone — every "panel" surface is now light. */
+    --bg: #FAF9F5;             /* ivory page background */
     --surface: #ffffff;        /* white card / map container */
-    --panel: #0f172a;          /* deep slate panel (was teal) */
-    --panel-2: #1e293b;        /* slightly lighter slate (header band, etc.) */
-    --panel-text: #e2e8f0;     /* high-contrast on dark */
-    --muted: #94a3b8;          /* slate-400 - secondary on dark */
-    --muted-on-light: #64748b; /* secondary on light bg */
-    --text: #0f172a;           /* primary text on light bg */
-    --accent: #f59e0b;         /* amber */
-    --accent-hover: #d97706;
-    --accent-2: #14b8a6;       /* teal (secondary) */
-    --border: #e5e7eb;         /* hairline border on light */
-    --border-strong: #cbd5e1;  /* heavier hairline */
-    --border-dark: #334155;    /* hairline on dark surfaces */
-    --shadow-sm: 0 1px 2px rgba(15,23,42,0.06);
-    --shadow-md: 0 4px 12px -2px rgba(15,23,42,0.10), 0 2px 4px -1px rgba(15,23,42,0.06);
-    --radius: 10px;
-    --radius-sm: 6px;
+    --panel: #F0EEE6;          /* bone panel (was deep slate — now light) */
+    --panel-2: #E7E4D8;        /* deeper bone (hover, wells) */
+    --panel-text: #45443E;     /* body text on bone panels */
+    --muted: #63625A;          /* secondary text on bone — 5.28:1 on --panel,
+                                  5.82:1 on --bg (both AA at 10-13px) */
+    --muted-on-light: #63625A; /* secondary text on ivory/white (same value:
+                                  one token clears AA on every surface) */
+    --text: #1F1E1D;           /* warm ink — primary text */
+    --accent: #D97757;         /* terracotta (Claude) — fills, borders,
+                                  slider/checkbox accents. NOT a background
+                                  for white text: only 3.12:1. */
+    --accent-solid: #B85434;   /* the same terracotta darkened until white
+                                  13px text clears AA on it (4.82:1) — use
+                                  for buttons and active pills */
+    --accent-hover: #C15F3C;
+    --accent-deep: #9C4A2F;    /* pressed / dark accent text */
+    --accent-tint: rgba(217,119,87,0.10);
+    --accent-2: #788C5D;       /* muted olive (secondary) */
+    --support: #B0402F;        /* Support/Donate warm red (semantic) */
+    --support-hover: #963526;
+    --border: #E8E5DA;         /* hairline on ivory/white */
+    --border-strong: #D9D5C7;  /* heavier hairline */
+    --border-dark: #DCD8CB;    /* legacy name — now the hairline on bone panels */
+    --shadow-sm: 0 1px 2px rgba(60,50,30,0.05);
+    --shadow-md: 0 4px 14px -2px rgba(60,50,30,0.10), 0 2px 4px -1px rgba(60,50,30,0.05);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --font-ui: "Archivo", -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    --font-display: "Source Serif 4", "Tiempos Text", Georgia, "Times New Roman", serif;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+    font-family: var(--font-ui);
     background: var(--bg);
     color: var(--text);
     -webkit-font-smoothing: antialiased;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
   }
   .wrap {
     max-width: 1600px;
@@ -75,22 +95,23 @@
   .pic-folder-row {
     display: flex; flex-direction: column;
     padding: 8px 10px;
-    border: 1px solid #555; border-radius: 6px;
-    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border-strong); border-radius: 8px;
+    background: var(--surface);
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
   }
   .pic-folder-row:hover {
-    background: rgba(255,255,255,0.06);
-    border-color: #888; color: #fff;
+    background: var(--accent-tint);
+    border-color: var(--accent);
   }
   .pic-folder-row.active {
-    background: rgba(56,189,248,0.18);
-    border-color: rgb(56,189,248); color: #fff;
+    background: var(--accent-tint);
+    border-color: var(--accent);
   }
   .pic-folder-row .pic-folder-title {
-    font-size: 13px; font-weight: 600; color: #fff;
+    font-size: 13px; font-weight: 600; color: var(--text);
   }
+  .pic-folder-row.active .pic-folder-title { color: var(--accent-deep); }
   .pic-folder-row .pic-folder-meta {
     font-size: 11px; color: var(--muted); margin-top: 2px;
     font-variant-numeric: tabular-nums;
@@ -105,7 +126,8 @@
     margin-bottom: 12px;
   }
   .pic-gallery-header h3 {
-    margin: 0; font-size: 18px; font-weight: 700;
+    margin: 0; font-size: 20px; font-weight: 600;
+    font-family: var(--font-display);
     color: var(--text);
   }
   .pic-gallery-subtitle {
@@ -125,16 +147,16 @@
     padding: 60px 20px;
     background: var(--surface);
     border-radius: var(--radius-sm);
-    border: 1px dashed rgba(15,23,42,0.18);
+    border: 1px dashed var(--border-strong);
   }
   .pic-thumb {
     position: relative;
     aspect-ratio: 4 / 3;
     overflow: hidden;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: zoom-in;
-    background: #ddd;
-    box-shadow: 0 1px 4px rgba(15,23,42,0.08);
+    background: var(--panel-2);
+    box-shadow: 0 1px 4px rgba(60,50,30,0.08);
     transition: transform 0.18s, box-shadow 0.18s;
   }
   .pic-thumb img {
@@ -145,14 +167,14 @@
   }
   .pic-thumb:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(15,23,42,0.18);
+    box-shadow: 0 6px 16px rgba(60,50,30,0.18);
   }
   .pic-thumb:hover img { transform: scale(1.04); }
 
-  /* Pictures tab — lightbox */
+  /* Pictures tab — lightbox (stays dark: photos read best on near-black) */
   .pic-lightbox {
     position: fixed; inset: 0;
-    background: rgba(0,0,0,0.86);
+    background: rgba(23,21,18,0.88);
     z-index: 500;
     display: flex; align-items: center; justify-content: center;
   }
@@ -197,11 +219,11 @@
     position: fixed;
     left: 0; right: 0; bottom: 0;
     z-index: 300;
-    background: rgba(255,255,255,0.78);
+    background: rgba(250,249,245,0.82);
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
-    border-top: 1px solid rgba(15,23,42,0.08);
-    box-shadow: 0 -4px 14px rgba(15,23,42,0.06);
+    border-top: 1px solid rgba(60,50,30,0.10);
+    box-shadow: 0 -4px 14px rgba(60,50,30,0.05);
     padding: 8px 14px;
     opacity: 0.85;
     transition: opacity 0.2s;
@@ -250,7 +272,8 @@
     gap: 4px;
     background: var(--surface);
     padding: 4px;
-    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    border-radius: 999px;
     box-shadow: var(--shadow-sm);
     width: fit-content;
   }
@@ -259,61 +282,65 @@
     color: var(--muted-on-light);
     border: none;
     padding: 9px 20px;
-    border-radius: var(--radius-sm);
+    border-radius: 999px;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
+    font-family: var(--font-ui);
     letter-spacing: -0.01em;
     cursor: pointer;
     transition: all .15s ease;
   }
   .tab.active {
-    background: var(--panel);
-    color: #fff;
+    background: var(--text);
+    color: var(--bg);
   }
   .tab:hover:not(.active) {
-    background: rgba(15,23,42,0.06);
+    background: var(--panel);
     color: var(--text);
   }
-  /* Support tab accent — heart in red, slight pop */
-  .tab.tab-support             { color: #b91c1c; }
-  .tab.tab-support:hover:not(.active) { color: #991b1b; background: rgba(185,28,28,0.08); }
-  .tab.tab-support.active      { background: #b91c1c; color: #fff; }
+  /* Support tab accent — heart in warm red, slight pop */
+  .tab.tab-support             { color: var(--support); }
+  .tab.tab-support:hover:not(.active) { color: var(--support-hover); background: rgba(176,64,47,0.08); }
+  .tab.tab-support.active      { background: var(--support); color: #fff; }
 
   /* Inline ♥ Donate link in the credit area */
   .credit-donate {
-    color: #b91c1c; font-weight: 600; text-decoration: none;
+    color: var(--support); font-weight: 600; text-decoration: none;
     padding: 2px 8px; border-radius: 999px;
-    border: 1px solid rgba(185,28,28,0.3);
-    background: rgba(185,28,28,0.06);
+    border: 1px solid rgba(176,64,47,0.30);
+    background: rgba(176,64,47,0.06);
     transition: background 0.15s;
   }
-  .credit-donate:hover { background: rgba(185,28,28,0.15); }
+  .credit-donate:hover { background: rgba(176,64,47,0.14); }
 
-  /* Support side panel — highlighted hero card + CTA. Important: stack the
-     red tint over the dark panel background so the dark theme is preserved
-     and the white text stays legible. */
+  /* Support side panel — highlighted hero card + CTA. A soft red wash over
+     the light bone card, warm-red left border, ink text. */
   #side-support .card.support-hero {
-    border-left: 4px solid #b91c1c;
+    border-left: 4px solid var(--support);
     background:
-      linear-gradient(180deg, rgba(185,28,28,0.22), rgba(185,28,28,0) 70%),
+      linear-gradient(180deg, rgba(176,64,47,0.10), rgba(176,64,47,0) 70%),
       var(--panel);
   }
   #side-support .card.support-cta {
-    border: 1px solid rgba(185,28,28,0.55);
+    border: 1px solid rgba(176,64,47,0.45);
     background:
-      linear-gradient(180deg, rgba(185,28,28,0.18), rgba(185,28,28,0.05) 80%),
+      linear-gradient(180deg, rgba(176,64,47,0.08), rgba(176,64,47,0.02) 80%),
       var(--panel);
   }
   #side-support .support-mail {
     display: inline-block; margin: 6px 0;
-    color: #fff; background: #b91c1c;
+    color: #fff; background: var(--support);
     padding: 8px 14px; border-radius: 8px;
     text-decoration: none; font-weight: 600;
   }
-  #side-support .support-mail:hover { background: #991b1b; }
-  #side-support h4 { margin-bottom: 6px; color: #fff; text-transform: none; font-size: 14px; }
+  #side-support .support-mail:hover { background: var(--support-hover); }
+  #side-support h4 {
+    margin-bottom: 6px; color: var(--text); text-transform: none;
+    font-size: 16px; font-family: var(--font-display); font-weight: 600;
+    letter-spacing: 0;
+  }
   #side-support p, #side-support ul, #side-support li { color: var(--panel-text); }
-  #side-support b { color: #fff; }
+  #side-support b { color: var(--text); }
   /* layout */
   .layout {
     display: grid;
@@ -341,6 +368,7 @@
   .map-controls {
     background: var(--panel);
     color: var(--panel-text);
+    border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     padding: 12px 14px;
     display: flex;
@@ -357,15 +385,14 @@
   .map-controls input[type="date"],
   .map-controls select {
     padding: 5px 8px;
-    border: 1px solid var(--border-dark);
-    border-radius: 5px;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
     font-size: 12px;
-    background: var(--panel-2);
-    color: #fff;
+    background: var(--surface);
+    color: var(--text);
     font-family: inherit;
   }
   .map-controls input[type="date"]::-webkit-calendar-picker-indicator {
-    filter: invert(0.8);
     cursor: pointer;
   }
   .map-controls .overlay-info {
@@ -376,16 +403,16 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid var(--border-dark);
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
     padding: 5px 10px;
-    border-radius: 5px;
+    border-radius: 6px;
     font-size: 12px;
     cursor: pointer;
     transition: background .12s ease, border-color .12s ease;
   }
   .map-controls .layer-row label:hover {
-    background: rgba(255,255,255,0.10);
+    background: var(--accent-tint);
     border-color: var(--accent);
   }
   .map-controls .layer-row label.disabled {
@@ -394,6 +421,20 @@
   }
   .map-controls input[type="checkbox"] { accent-color: var(--accent); }
   .map-controls input[type="range"] { accent-color: var(--accent); }
+  /* Terracotta accent for every native control (side-panel checkboxes,
+     radios, sliders). More-specific rules (e.g. .controls currentColor
+     trace-colored checkboxes) still win. */
+  input[type="checkbox"], input[type="radio"], input[type="range"] {
+    accent-color: var(--accent);
+  }
+  /* Keyboard focus: the UA default blue ring reads as a foreign element in
+     this palette, so state it in theme terms. :focus-visible only, so a
+     mouse click on a pill/tab doesn't leave a ring behind. */
+  :focus-visible {
+    outline: 2px solid var(--accent-deep);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
   .colorbars {
     display: flex;
     flex-direction: column;
@@ -409,7 +450,7 @@
   .cb-prefix {
     min-width: 110px;
     font-weight: 600;
-    color: #fff;
+    color: var(--text);
   }
   .cb-min, .cb-max { min-width: 28px; text-align: right; }
   .cb-max { text-align: left; min-width: 60px; }
@@ -435,9 +476,9 @@
     gap: 8px;
   }
   .stats-cell {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
     padding: 8px 6px;
     text-align: center;
   }
@@ -449,9 +490,10 @@
     margin-bottom: 4px;
   }
   .stats-value {
-    font-size: 20px;
-    font-weight: 700;
-    color: #fff;
+    font-size: 22px;
+    font-weight: 600;
+    font-family: var(--font-display);
+    color: var(--text);
     font-variant-numeric: tabular-nums;
   }
   .stats-hint {
@@ -459,11 +501,12 @@
     font-size: 11px; line-height: 1.55;
     color: var(--muted);
   }
-  .stats-hint b { color: var(--panel-text); font-weight: 600; }
-  .stats-hint code { font-size: 10px; color: var(--panel-text); }
-  .pulse-legend { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; }
+  .stats-hint b { color: var(--text); font-weight: 600; }
+  .stats-hint code { font-size: 10px; color: var(--text); }
+  .pulse-legend { display: inline; margin-top: 4px; }
   .pulse-legend-dot {
     display: inline-block; width: 10px; height: 10px;
+    vertical-align: middle; margin-right: 4px;
     background: #1f8fff; border: 2px solid #0a3a72; border-radius: 50%;
     position: relative; flex-shrink: 0;
     box-shadow: 0 0 0 0 rgba(239,68,68,0.75);
@@ -471,9 +514,10 @@
   }
   .station-id {
     text-align: center;
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 600;
-    letter-spacing: -0.01em;
+    font-family: var(--font-display);
+    letter-spacing: 0;
     color: var(--text);
     padding: 6px 0;
   }
@@ -485,7 +529,8 @@
   .card {
     background: var(--panel);
     color: var(--panel-text);
-    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     padding: 14px 16px;
     min-height: 110px;
     font-size: 13px;
@@ -501,10 +546,11 @@
   }
   .ts-card {
     background: var(--panel);
-    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     padding: 12px;
   }
-  #chart { width: 100%; height: 360px; background: #fff; border-radius: 5px; }
+  #chart { width: 100%; height: 360px; background: #fff; border-radius: 6px; }
   .chart-msg { display:flex; align-items:center; justify-content:center; height:100%; color:var(--muted-on-light); font-size:13px; }
   .controls {
     display: flex;
@@ -548,8 +594,9 @@
   }
   .photos {
     background: var(--panel);
-    color: #fff;
-    border-radius: var(--radius-sm);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     padding: 14px 16px;
   }
   .photos h4 {
@@ -574,7 +621,7 @@
     align-items: center;
     justify-content: center;
     flex-direction: column;
-    color: #6e8a99;
+    color: var(--muted);
     font-size: 11px;
   }
   .photo-grid img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -585,9 +632,9 @@
   }
   .btn {
     flex: 1;
-    background: var(--accent);
+    background: var(--accent-solid);
     color: #fff;
-    border: none;
+    border: 1px solid transparent;
     padding: 12px 16px;
     border-radius: var(--radius-sm);
     font-size: 13px;
@@ -603,7 +650,9 @@
     box-shadow: var(--shadow-md);
   }
   .btn-secondary {
-    background: var(--panel);
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
   }
   .btn-secondary:hover {
     background: var(--panel-2);
@@ -621,18 +670,16 @@
     display: flex; align-items: center; gap: 4px; margin-bottom: 6px;
     max-width: 280px;          /* match .lband-cal so controls align to grid */
   }
-  /* explicit white (var(--text) was getting overridden inside the card on
-     dark theme, leaving the label invisible). flex:1 + text-align:center
-     pins ‹ to the far left of the strip and › to the right edge regardless
-     of month-name length. */
+  /* flex:1 + text-align:center pins ‹ to the far left of the strip and ›
+     to the right edge regardless of month-name length. */
   .lband-cal-label    {
     flex: 1; text-align: center;
     font-weight: 600; font-size: 13px;
-    color: #fff;
+    color: var(--text);
     cursor: pointer; user-select: none;
     padding: 2px 4px; border-radius: 4px;
   }
-  .lband-cal-label:hover { background: rgba(255,255,255,0.06); }
+  .lband-cal-label:hover { background: rgba(60,50,30,0.06); }
   .lband-cal-nav      { padding:2px 8px; font-size:12px; line-height:1; }
   /* year/month picker (revealed by clicking the label) */
   .lband-cal-picker { display:none; align-items:center; gap:4px; flex:1; }
@@ -663,17 +710,17 @@
     color: var(--text); background: var(--surface);
     border: 1px solid transparent;
   }
-  .lband-cal .lband-day.lband-other { color: #ccc; }
-  .lband-cal .lband-day.lband-today { font-weight:700; outline:1px solid #888; }
+  .lband-cal .lband-day.lband-other { color: #C9C5B8; }
+  .lband-cal .lband-day.lband-today { font-weight:700; outline:1px solid var(--muted); }
   .lband-cal .lband-day.lband-flight {
     cursor:pointer; font-weight:600;
-    color:#7f1d1d;
-    border:1px solid #dc2626;
-    background:#fee2e2;
+    color:var(--accent-deep);
+    border:1px solid var(--accent);
+    background:#F7DFD3;
   }
-  .lband-cal .lband-day.lband-flight:hover { background:#fecaca; }
+  .lband-cal .lband-day.lband-flight:hover { background:#F2CDBB; }
   .lband-cal .lband-day.lband-selected {
-    background:#dc2626; color:#fff; border-color:#7f1d1d;
+    background:var(--accent-solid); color:#fff; border-color:var(--accent-deep);
   }
   .lband-row { display:flex; align-items:center; flex-wrap:wrap; gap:8px 12px; padding:4px 0; }
   .lband-row-label { font-size:12px; color:var(--muted); min-width:60px; }
@@ -685,25 +732,26 @@
   .uav-pill {
     flex: 1 1 auto;
     min-width: 78px;
-    background: transparent;
+    background: var(--surface);
     color: var(--muted);
-    border: 1px solid var(--border);
-    border-radius: 7px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
     padding: 8px 10px;
     font-size: 13px;
     font-weight: 600;
+    font-family: var(--font-ui);
     cursor: pointer;
     transition: background .15s ease, color .15s ease, border-color .15s ease, transform .1s ease;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     line-height: 1.15;
     text-align: center;
   }
-  .uav-pill:hover { background: rgba(255,255,255,0.05); color: #fff; border-color: #888; }
+  .uav-pill:hover { background: var(--accent-tint); color: var(--text); border-color: var(--accent); }
   .uav-pill.active {
-    background: #dc2626;
+    background: var(--accent-solid);
     color: #fff;
-    border-color: #b91c1c;
-    box-shadow: 0 1px 3px rgba(220,38,38,0.35);
+    border-color: var(--accent-deep);
+    box-shadow: 0 1px 3px rgba(184,84,52,0.35);
   }
   .uav-pill .uav-pill-name { display:block; }
   .uav-pill .uav-pill-sub  {
@@ -711,22 +759,14 @@
     color: var(--muted); margin-top: 2px;
     letter-spacing: 0.02em;
   }
-  .uav-pill.active .uav-pill-sub { color: rgba(255,255,255,0.85); }
+  /* 10px on a colored fill — keep it fully opaque so it stays AA (4.82:1);
+     the 0.88 alpha it used to have dropped it to 4.10:1. */
+  .uav-pill.active .uav-pill-sub { color: #fff; }
   /* Give the L-band pill (with subtitle) a bit more breathing room */
   .uav-pill[data-payload="lband"] { flex: 2 1 auto; min-width: 130px; }
   /* Same treatment for the multi-line satellite pills */
   #satProductPills .uav-pill { flex: 1 1 auto; min-width: 110px; }
   #satProductPills .uav-pill[data-source="nisar"] { flex: 2 1 auto; min-width: 130px; }
-  /* Text-badge fallback for satellite "sensor" image (no payload photo) */
-  .sat-sensor-badge {
-    display: flex; align-items: center; justify-content: center;
-    width: 110px; height: 110px;
-    border-radius: 6px;
-    color: #fff; font-weight: 700; font-size: 20px;
-    letter-spacing: 0.04em;
-    flex: 0 0 auto;
-    text-align: center;
-  }
   /* Sensor info card under the Products pills */
   .uav-sensor-card { padding: 12px 14px; }
   .uav-sensor-row {
@@ -739,13 +779,13 @@
     max-height: 110px;
     object-fit: contain;
     border-radius: 6px;
-    background: rgba(255,255,255,0.05);
+    background: var(--surface);
     flex: 0 0 auto;
   }
   .uav-sensor-text { flex: 1 1 auto; min-width: 0; }
   .uav-sensor-name {
     font-size: 13px; font-weight: 600;
-    color: #fff; margin-bottom: 4px;
+    color: var(--text); margin-bottom: 4px;
   }
   .uav-sensor-desc {
     font-size: 12px; line-height: 1.5;
@@ -764,16 +804,16 @@
     text-transform: uppercase; letter-spacing: 0.06em;
     margin-bottom: 6px; font-weight: 700;
   }
-  .uav-flight-count { color:#dc2626; font-size:10px; font-weight:600; }
+  .uav-flight-count { color:var(--accent-deep); font-size:10px; font-weight:600; }
   .uav-flight-clear {
     margin-left: 6px;
     font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
-    color: #dc2626; background: transparent;
-    border: 1px solid rgba(220,38,38,0.45); border-radius: 999px;
+    color: var(--accent-deep); background: transparent;
+    border: 1px solid rgba(217,119,87,0.50); border-radius: 999px;
     padding: 1px 8px; cursor: pointer;
     text-transform: uppercase;
   }
-  .uav-flight-clear:hover     { background: rgba(220,38,38,0.12); color: #b91c1c; }
+  .uav-flight-clear:hover     { background: var(--accent-tint); color: var(--accent-deep); }
   .uav-flight-clear:disabled  { opacity: 0.35; cursor: not-allowed; }
   .uav-flight-list {
     display: flex; flex-direction: column; gap: 3px;
@@ -789,20 +829,20 @@
   .uav-flight-row {
     display: flex; align-items: center; gap: 8px;
     padding: 5px 8px;
-    border-radius: 5px;
-    border: 1px solid var(--border);
-    background: transparent;
-    color: #e5e7eb;                           /* explicit light text on dark side panel */
+    border-radius: 6px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--panel-text);
     cursor: pointer;
     font-size: 12px;
     line-height: 1.2;
     transition: background .12s ease, border-color .12s ease, color .12s ease;
   }
-  .uav-flight-row:hover { background: rgba(255,255,255,0.06); border-color:#888; color:#fff; }
+  .uav-flight-row:hover { background: var(--accent-tint); border-color: var(--accent); color: var(--text); }
   .uav-flight-row.selected {
-    background: #fee2e2;
-    color: #7f1d1d;                           /* dark-on-light when selected */
-    border-color: #dc2626;
+    background: #F7DFD3;
+    color: var(--accent-deep);
+    border-color: var(--accent);
     font-weight: 600;
   }
   .uav-flight-row .uav-flight-date  { flex:1; font-variant-numeric: tabular-nums; }
@@ -815,7 +855,7 @@
     position: relative;
   }
   .uav-flight-row.selected .uav-flight-check {
-    background: #dc2626; border-color: #7f1d1d;
+    background: var(--accent-solid); border-color: var(--accent-deep);
   }
   .uav-flight-row.selected .uav-flight-check::after {
     content: "✓";
@@ -873,10 +913,10 @@
     transform: translateY(-2px);
   }
   .logo-slot.logo-missing {
-    color: #888;
+    color: var(--muted);
     font-size: 12px;
     font-weight: 600;
-    border: 1.5px dashed #c0c6cc;
+    border: 1.5px dashed var(--border-strong);
     border-radius: 4px;
     padding: 0 14px;
     height: 56px;
@@ -916,11 +956,11 @@
     cursor: pointer;
   }
   .station-dot.selected {
-    background: #f59e0b;
-    border-color: #78350f;
+    background: #D97757;
+    border-color: #6B3320;
     width: 18px;
     height: 18px;
-    box-shadow: 0 0 0 2px rgba(245,158,11,0.35);
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.9), 0 0 0 4px rgba(217,119,87,0.45);
   }
   /* "Recent activity" pulse — applied when this station has data within
      the last RECENT_DAYS. The animation just modulates a red ring around
@@ -984,12 +1024,12 @@
     font-size: 10px; font-weight: 700; letter-spacing: .03em;
     text-transform: uppercase; white-space: nowrap;
     padding: 2px 6px; border-radius: 10px;
-    background: rgba(37,99,235,0.20); color: #93c5fd;
-    border: 1px solid rgba(37,99,235,0.55);
+    background: rgba(37,99,235,0.10); color: #1D4ED8;
+    border: 1px solid rgba(37,99,235,0.35);
   }
   .soil-badge.est {
-    background: rgba(148,163,184,0.15); color: var(--muted);
-    border-color: rgba(148,163,184,0.40);
+    background: rgba(117,116,106,0.10); color: var(--muted);
+    border-color: rgba(117,116,106,0.35);
   }
   .soil-spot { margin-top: 6px; }
   .soil-spot b { color: var(--panel-text); }
@@ -1078,8 +1118,6 @@
       padding: 7px 8px;
       font-size: 12px;
     }
-    .sat-sensor-badge { width: 80px; height: 80px; font-size: 16px; }
-
     /* L-band calendar: let it fill the column width */
     .lband-cal, .lband-cal-controls { max-width: 100%; }
 
@@ -1143,51 +1181,54 @@
 .model-chip-row {
   display: flex; flex-wrap: wrap; gap: 4px;
   max-height: 118px; overflow-y: scroll;
-  padding: 6px; border: 1px solid var(--border-dark); border-radius: 6px;
+  padding: 6px; border: 1px solid var(--border-strong); border-radius: 8px;
+  background: var(--surface);
   scrollbar-width: thin;                       /* Firefox */
-  scrollbar-color: var(--muted) rgba(255,255,255,0.08);
+  scrollbar-color: var(--border-strong) rgba(60,50,30,0.05);
 }
 .model-chip-row::-webkit-scrollbar { width: 11px; }
 .model-chip-row::-webkit-scrollbar-track {
-  background: rgba(255,255,255,0.08); border-radius: 6px;
+  background: rgba(60,50,30,0.05); border-radius: 6px;
 }
 .model-chip-row::-webkit-scrollbar-thumb {
-  background: var(--muted); border-radius: 6px;
+  background: var(--border-strong); border-radius: 6px;
   border: 2px solid transparent; background-clip: content-box;
 }
 .model-chip-row::-webkit-scrollbar-thumb:hover {
-  background: var(--panel-text); background-clip: content-box;
+  background: var(--muted); background-clip: content-box;
 }
 .model-chip {
   font-size: 11px; line-height: 1.2; padding: 3px 8px;
-  border: 1px solid var(--border-dark); border-radius: 11px;
+  border: 1px solid var(--border-strong); border-radius: 11px;
   background: transparent; color: var(--panel-text);
   cursor: pointer; white-space: nowrap;
 }
 .model-chip:hover { border-color: var(--muted); }
-.model-chip.active { color: #fff; border-color: transparent; }
+/* Active chip: fill is the AA-safe darkened variant, but the border carries
+   the station's actual chart-trace color so the chip still reads as the key
+   for its line. JS sets both (background + borderColor). */
+.model-chip.active { color: #fff; border-width: 1px; border-style: solid; }
 
-/* About Data tab — readable article column */
+/* About Data tab — readable article column. Serif body, Claude-style. */
 .about-article {
   max-width: 820px;
   padding: 6px 10px 24px;
-  font-size: 14px;
-  line-height: 1.65;
-  color: var(--text, #0f172a);   /* article sits on the white map column,
-                                    NOT the dark side panel — don't use
-                                    --panel-text here */
+  font-family: var(--font-display);
+  font-size: 15.5px;
+  line-height: 1.7;
+  color: var(--text);
 }
-.about-article h2 { font-size: 21px; margin: 8px 0 4px; }
-.about-article h3 { font-size: 16px; margin: 22px 0 6px; border-bottom: 1px solid var(--border, #ddd); padding-bottom: 4px; }
+.about-article h2 { font-family: var(--font-display); font-weight: 600; font-size: 27px; margin: 8px 0 6px; letter-spacing: -0.01em; }
+.about-article h3 { font-family: var(--font-display); font-weight: 600; font-size: 19px; margin: 26px 0 6px; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
 .about-article p  { margin: 8px 0; }
 .about-article ul { margin: 6px 0 10px 22px; }
 .about-article li { margin: 3px 0; }
-.about-lead { font-size: 15px; }
-.about-foot { margin-top: 20px; font-size: 13px; color: #6b6257; border-top: 1px solid var(--border, #ddd); padding-top: 12px; }
+.about-lead { font-size: 17px; }
+.about-foot { margin-top: 20px; font-size: 14px; color: var(--muted-on-light); border-top: 1px solid var(--border); padding-top: 12px; }
 .about-table-wrap { overflow-x: auto; margin: 8px 0 12px; }
-.about-table { border-collapse: collapse; width: 100%; font-size: 13px; }
-.about-table th, .about-table td { border: 1px solid var(--border, #ddd); padding: 6px 9px; text-align: left; vertical-align: top; }
-.about-table th { background: rgba(31,111,204,.08); }
+.about-table { border-collapse: collapse; width: 100%; font-size: 13px; font-family: var(--font-ui); }
+.about-table th, .about-table td { border: 1px solid var(--border); padding: 6px 9px; text-align: left; vertical-align: top; }
+.about-table th { background: var(--accent-tint); }
 
 /* Team tab — acknowledgement cards for the students who run the site's
    field work. Full-width single column (map hidden), like About Data. */
@@ -1201,56 +1242,80 @@
 }
 .team-card {
   background: #fff;
-  border: 1px solid var(--border, #ddd);
-  border-radius: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
   padding: 22px 18px 18px;
   text-align: center;
-  box-shadow: 0 1px 6px rgba(15,23,42,0.06);
+  font-family: var(--font-ui);
+  box-shadow: 0 1px 6px rgba(60,50,30,0.06);
 }
 .team-card img {
   width: 148px; height: 148px;
   border-radius: 50%;
   object-fit: cover;
-  border: 3px solid rgba(31,111,204,.25);
+  border: 3px solid rgba(217,119,87,.40);
   display: block;
   margin: 0 auto 12px;
 }
-.team-name { font-size: 16px; font-weight: 700; color: var(--text, #0f172a); }
+.team-name { font-size: 18px; font-weight: 600; font-family: var(--font-display); color: var(--text); }
 .team-role {
   display: inline-block;
   margin: 6px 0 10px;
   font-size: 11.5px; font-weight: 700;
   letter-spacing: .04em; text-transform: uppercase;
-  color: #1f6fcc;
-  background: rgba(31,111,204,.10);
-  border: 1px solid rgba(31,111,204,.30);
+  color: var(--accent-deep);
+  background: var(--accent-tint);
+  border: 1px solid rgba(217,119,87,.40);
   border-radius: 12px;
   padding: 3px 10px;
 }
-.team-desc { font-size: 13px; line-height: 1.6; color: #475569; text-align: left; }
+.team-desc { font-size: 13px; line-height: 1.6; color: var(--panel-text); text-align: left; }
 
 /* Boot overlay — painted with the first HTML bytes, dismissed by
    dismissBootOverlay() once stations are on the map (or by its own
-   15 s safety timer if anything upstream fails). */
+   15 s safety timer if anything upstream fails). The spinner is the
+   site's signature: a slowly turning terracotta starburst. */
 #bootOverlay {
   position: fixed; inset: 0; z-index: 9999;
-  background: #f6f7f9;                 /* matches --bg so the reveal is seamless */
+  background: #FAF9F5;                 /* matches --bg so the reveal is seamless */
   display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 16px;
+  align-items: center; justify-content: center; gap: 14px;
   transition: opacity .35s ease;
 }
 #bootOverlay.done { opacity: 0; pointer-events: none; }
 .boot-spinner {
-  width: 44px; height: 44px; border-radius: 50%;
-  border: 4px solid rgba(31, 111, 204, .22);
-  border-top-color: #1f6fcc;
-  animation: bootSpin .9s linear infinite;
+  width: 52px; height: 52px;
+  animation: bootSpin 2.6s linear infinite;
+}
+.boot-spinner svg { width: 100%; height: 100%; display: block; }
+.boot-title {
+  font-family: var(--font-display);
+  font-size: 24px; font-weight: 600; color: #1F1E1D;
+  letter-spacing: -0.01em;
 }
 .boot-text {
-  font-size: 14px; font-weight: 500; color: #6b6257;
+  font-size: 13px; font-weight: 500; color: #75746A;
   letter-spacing: .02em;
 }
 @keyframes bootSpin { to { transform: rotate(360deg); } }
+
+/* Respect reduced-motion: stop the spin, and freeze the station pulse
+   rings into static halos so the recent/soil signals stay visible.
+   The two rings sit on pseudo-elements with IDENTICAL geometry
+   (.recent::after over .soil::before), so equal spreads would let the red
+   ring paint straight over the blue one and a station that is both recent
+   AND soil-sampled would show only red. Animated, they stay legible
+   because they differ in time and radius; frozen, they must differ in
+   radius alone — blue wider, so the two nest as concentric rings. */
+@media (prefers-reduced-motion: reduce) {
+  .boot-spinner { animation: none; }
+  .station-dot.recent::after, .pulse-legend-dot {
+    animation: none; box-shadow: 0 0 0 3px rgba(239,68,68,0.65);
+  }
+  .station-dot.soil::before, .pulse-legend-dot.soil-dot {
+    animation: none; box-shadow: 0 0 0 7px rgba(37,99,235,0.65);
+  }
+}
 </style>
 </head>
 <body>
@@ -1275,8 +1340,18 @@
 })();
 </script>
 <div id="bootOverlay" aria-hidden="true">
-  <div class="boot-spinner"></div>
-  <div class="boot-text">Loading Hampyeong Cal/Val Portal…</div>
+  <div class="boot-spinner">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+      <g stroke="#D97757" stroke-width="5" stroke-linecap="round">
+        <path d="M24 5v10"/><path d="M24 33v10"/>
+        <path d="M5 24h10"/><path d="M33 24h10"/>
+        <path d="M10.6 10.6l7 7"/><path d="M30.4 30.4l7 7"/>
+        <path d="M37.4 10.6l-7 7"/><path d="M17.6 30.4l-7 7"/>
+      </g>
+    </svg>
+  </div>
+  <div class="boot-title">Hampyeong Cal/Val</div>
+  <div class="boot-text">Loading the data portal…</div>
 </div>
 <div class="wrap">
 
@@ -1731,12 +1806,12 @@
         <div id="chart"></div>
         <div id="sceneStrip" style="height:90px;margin-top:4px;cursor:pointer;"></div>
         <div style="font-size:10px;color:var(--muted);text-align:right;margin-top:2px;">
-          Click a red dot to jump the Overlay date to that scene.
+          Click a dot to jump the Overlay date to that scene.
         </div>
       </div>
 
       <div class="controls" id="varList">
-        <span style="color:#888;font-size:12px;">Variables will load from the CSV header.</span>
+        <span style="color:var(--muted-on-light);font-size:12px;">Variables will load from the CSV header.</span>
       </div>
 
       <div class="date-row">
@@ -1758,7 +1833,7 @@
         <button class="btn" id="downloadOne">Request this station's data</button>
         <button class="btn btn-secondary" id="downloadAll">Request bulk data (all stations)</button>
       </div>
-      <div class="request-hint" style="font-size:12px;color:#666;margin-top:6px;line-height:1.4;">
+      <div class="request-hint" style="font-size:12px;color:var(--muted-on-light);margin-top:6px;line-height:1.4;">
         Data requests are handled by email — no direct download from the
         portal. Please include your name, affiliation, intended use, the
         variables and time range you need. We will reply within a few
@@ -1815,7 +1890,7 @@
             </div>
             <div id="lbandCalendar" class="lband-cal"></div>
             <div id="lbandCalHint" style="font-size:11px;color:var(--muted);margin-top:6px;">
-              Red-filled days have a flight. Click to add/remove from the map.
+              Highlighted days have a flight. Click to add/remove from the map.
             </div>
           </div>
           <div class="uav-flight-list-col">
@@ -1966,7 +2041,7 @@
             </div>
             <div id="satCalendar" class="lband-cal"></div>
             <div id="satCalHint" style="font-size:11px;color:var(--muted);margin-top:6px;">
-              Red-filled days have a scene. Click to add/remove from the map.
+              Highlighted days have a scene. Click to add/remove from the map.
             </div>
           </div>
           <div class="uav-flight-list-col">
@@ -2096,7 +2171,9 @@
       </div><!-- /model-cards-col -->
 
       <!-- Why-no-map explainer — wider card sharing the row with the 3 stacked
-           cards; a portrait animation matching the dark card background. -->
+           cards. The GIF's own background is painted to match --panel, so it
+           reads as part of the card; regenerate it with
+           make_why_no_map_gif.py if the theme tokens change. -->
       <div class="card model-why">
         <h4 style="margin-top:0;">Why a chart, not a map?</h4>
         <a href="assets/why-no-map.gif" target="_blank" rel="noopener"
@@ -2174,7 +2251,7 @@
         <details style="margin-top:8px;">
           <summary style="cursor:pointer;font-size:12px;color:var(--muted);">How to set up Cloudflare Web Analytics</summary>
           <ol style="font-size:12px;line-height:1.6;color:var(--panel-text);padding-left:18px;margin-top:6px;">
-            <li>Go to <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener" style="color:#7dd3fc;">dash.cloudflare.com</a> → <b>Analytics &amp; Logs</b> → <b>Web Analytics</b>.</li>
+            <li>Go to <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener" style="color:var(--accent-hover);">dash.cloudflare.com</a> → <b>Analytics &amp; Logs</b> → <b>Web Analytics</b>.</li>
             <li>Click <b>Add a site</b>, choose <b>"with a JavaScript snippet"</b>, enter <code>hyunglok-kim.github.io</code>.</li>
             <li>Copy the <code>data-cf-beacon</code> <b>token</b> (a 32-char hex string).</li>
             <li>In <code>index.html</code>, find <code>YOUR_CF_TOKEN</code> in the Cloudflare beacon script near the bottom, replace it with your token, commit + push.</li>
@@ -2468,11 +2545,15 @@ const CAT_INFO = {
   precip: { label: "Precipitation",    unit: "mm",    reversed: true,  kind: "bar"  },
   other:  { label: "Other",            unit: "",      reversed: false, kind: "line" },
 };
+// One UI font string for every Plotly layout (matches --font-ui in CSS).
+const CHART_FONT = '"Archivo", -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
+// Claude-warm trace palette. Semantics kept: SM = blues (water),
+// temp = terracotta/rust (heat), precip = teals (rain).
 const PALETTE = {
-  sm:     ["#1f6fcc", "#1f8fff", "#5fa8e0", "#0a4a87", "#3a90c0"],
-  temp:   ["#f59e0b", "#c25420", "#f0a070", "#8a3a0e", "#d96030"],
-  precip: ["#2a7596", "#3aa1c2"],
-  other:  ["#9b6bd1", "#d14b6b", "#f0b820", "#3ab2c4", "#7aa15a"],
+  sm:     ["#2E7BA8", "#4E97C2", "#1E5A80", "#7FB3D3", "#39698C"],
+  temp:   ["#C15F3C", "#A8462A", "#D98B66", "#7A3B24", "#C97845"],
+  precip: ["#1E7E93", "#3D9DB8"],
+  other:  ["#8D5A9E", "#A8802F", "#178A66", "#B34A6F", "#6B8F3D"],
 };
 // Convert the new ISMN station id (HP1301) to the legacy filename token
 // used by the photo dirs (HP_13_1). Leading zeros in the per-grid sub-index
@@ -2869,7 +2950,7 @@ function renderStationInfo(s) {
         <div class="soil-src">
           From the Korean Soil Information System (a national database), because
           this station has not been soil-sampled yet. Stations with a real lab
-          assay pulse <b style="color:#93c5fd;">blue</b> on the map.
+          assay pulse <b style="color:#1D4ED8;">blue</b> on the map.
         </div>
       </div>`;
   }
@@ -3409,7 +3490,7 @@ function dateMarkerShape(dateStr) {
   return {
     type: "line", xref: "x", yref: "paper",
     x0: dateStr, x1: dateStr, y0: 0, y1: 1,
-    line: { color: "#dc2626", width: 2, dash: "dot" },
+    line: { color: "#C15F3C", width: 2, dash: "dot" },
     editable: true,                                 // draggable
   };
 }
@@ -3418,7 +3499,7 @@ function dateMarkerAnnotation(dateStr) {
     xref: "x", yref: "paper",
     x: dateStr, y: 1.02,
     text: dateStr, showarrow: false,
-    bgcolor: "#dc2626", bordercolor: "#dc2626",
+    bgcolor: "#C15F3C", bordercolor: "#C15F3C",
     font: { color: "#fff", size: 11 },
     xanchor: "left", yanchor: "bottom",
   };
@@ -3542,11 +3623,11 @@ function renderVarUI() {
     lbl.style.color = v.color;
     lbl.innerHTML = `
       <input type="checkbox" ${v.checked ? "checked" : ""} />
-      <span style="color:#1a1a1a;">${v.name}</span>
+      <span style="color:#1F1E1D;">${v.name}</span>
       <input type="range" min="0" max="100" value="${Math.round(v.opacity * 100)}"
              title="opacity"
              style="width:50px;height:12px;margin-left:4px;accent-color:currentColor;vertical-align:middle;">
-      <span class="opacity-pct" style="color:#888;font-size:10px;width:24px;text-align:right;">${Math.round(v.opacity * 100)}%</span>
+      <span class="opacity-pct" style="color:#87867C;font-size:10px;width:24px;text-align:right;">${Math.round(v.opacity * 100)}%</span>
     `;
     const cb = lbl.querySelector('input[type="checkbox"]');
     const sl = lbl.querySelector('input[type="range"]');
@@ -3677,11 +3758,13 @@ function renderChart() {
 
   const layout = {
     margin: { l: 65, r: 70, t: 30, b: 40 },
+    font: { family: CHART_FONT, color: "#1F1E1D" },
     legend: { orientation: "h", x: 0, y: 1.18 },
     xaxis: {
       type: "date", domain: [0, xMax],
       range: xRangeInit,
       title: { text: "Time (UTC)", font: { size: 11 } },
+      gridcolor: "#ECE9E0",
     },
     plot_bgcolor: "#fff",
     paper_bgcolor: "#fff",
@@ -3703,8 +3786,8 @@ function renderChart() {
       title: { text: titleText, font: { color: axisColor, size: 12 } },
       tickfont: { color: axisColor, size: 11 },
       linecolor: axisColor,
-      gridcolor: "#eee",
-      zerolinecolor: "#ddd",
+      gridcolor: "#ECE9E0",
+      zerolinecolor: "#DDD9CC",
       automargin: true,                                // let Plotly fit labels
     };
 
@@ -3801,7 +3884,7 @@ function renderSceneStrip() {
     text: rows.map(r => `${hoverPrefix} ${r.date} ${(r.time||"").slice(0,5)}`),
     hovertemplate: "%{text}<extra></extra>",
     mode: "markers", type: "scatter",
-    marker: { size: 8, color: "#fca5a5", line: { color: "#dc2626", width: 1 } },
+    marker: { size: 8, color: "#EFC0AB", line: { color: "#C15F3C", width: 1 } },
     name: label, showlegend: false,
   });
   // hiLane ALWAYS returns a trace — empty arrays when there's nothing to
@@ -3819,7 +3902,7 @@ function renderSceneStrip() {
       text: r ? [`${hoverPrefix} ${r.date} ${(r.time||"").slice(0,5)}  ← selected`] : [],
       hovertemplate: "%{text}<extra></extra>",
       mode: "markers", type: "scatter",
-      marker: { size: 16, color: "#ef4444", line: { color: "#7f1d1d", width: 2.5 } },
+      marker: { size: 16, color: "#D97757", line: { color: "#6B3320", width: 2.5 } },
       name: label + " (selected)", showlegend: false,
     };
   };
@@ -3848,6 +3931,7 @@ function renderSceneStrip() {
   // The strip is small, so a full re-render is cheap.
   Plotly.newPlot("sceneStrip", traces, {
     margin: { l: 65, r: 70, t: 4, b: 18 },
+    font: { family: CHART_FONT, color: "#1F1E1D" },
     xaxis: {
       type: "date", showgrid: false,
       domain: xDomain, range: xRange,
@@ -4058,6 +4142,22 @@ document.querySelectorAll(".tab").forEach(btn => {
   });
 });
 
+// Deep-link a tab: ?tab=uav opens the UAVs tab on load (also handy for the
+// Webflow iframe, e.g. ?embed=1&tab=about). Deferred to DOMContentLoaded:
+// clicking during script evaluation would run tab handlers that reference
+// `let` bindings (e.g. _modelData) still in their temporal dead zone.
+window.addEventListener("DOMContentLoaded", function () {
+  try {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (!t) return;
+    const btn = document.querySelector(`.tab[data-tab="${CSS.escape(t)}"]`);
+    // Only open tabs the visitor can already see. The admin Analytics tab
+    // is gated by `display:none` until ?admin=<secret> unlocks it, and a
+    // deep link must not be a way around that gate.
+    if (btn && btn.offsetParent !== null) btn.click();
+  } catch (e) {}
+});
+
 // =============================================================
 // About Data tab — live "at a glance" numbers from loaded catalogs.
 // Called on every tab open (cheap; everything is already in memory).
@@ -4093,16 +4193,18 @@ function renderAboutStats() {
 // silently skips sources that structurally lack it (no bogus "missing" note).
 // `obs` = observed (GPM precip); `retrieval` = satellite estimate (MODIS ET) —
 // both are styled distinctly from the pure-model series.
+// Colors come from the site's validated categorical palette (fixed
+// assignment per source — never reshuffled when toggles change).
 const MODEL_META = {
-  SMAP_L4:   { label: "SMAP L4",   color: "#1d4ed8",
+  SMAP_L4:   { label: "SMAP L4",   color: "#2E7BA8",
                has: ["sm_surface", "sm_rootzone", "soil_temp_c", "precip_mm"] },
-  ERA5_LAND: { label: "ERA5-Land", color: "#b45309",
+  ERA5_LAND: { label: "ERA5-Land", color: "#A8802F",
                has: ["sm_surface", "soil_temp_c", "precip_mm", "et_mm"] },
-  GLDAS22:   { label: "GLDAS-2.2", color: "#7c3aed",
+  GLDAS22:   { label: "GLDAS-2.2", color: "#8D5A9E",
                has: ["sm_surface", "sm_rootzone", "soil_temp_c", "et_mm"] },
-  GPM_IMERG: { label: "GPM IMERG", color: "#0e7490", obs: true,
+  GPM_IMERG: { label: "GPM IMERG", color: "#178A66", obs: true,
                has: ["precip_mm"] },
-  MOD16A2:   { label: "MODIS ET",  color: "#15803d", retrieval: true,
+  MOD16A2:   { label: "MODIS ET",  color: "#C15F3C", retrieval: true,
                has: ["et_mm"] },
 };
 const MODEL_VAR_INFO = {
@@ -4176,11 +4278,22 @@ function modelNum(v) {
 // Multi-select station state for the Models tab. Any number of stations can
 // be overlaid; each gets a stable color by its index in `stations`.
 const modelStations = new Set();
-const STATION_PALETTE = ["#dc2626", "#ea580c", "#db2777", "#7c3aed",
-                         "#0891b2", "#65a30d", "#ca8a04", "#be123c"];
-function stationColor(id) {
-  const i = Math.max(0, stations.findIndex(s => s.station_id === id));
-  return STATION_PALETTE[i % STATION_PALETTE.length];
+const STATION_PALETTE = ["#C15F3C", "#2E7BA8", "#A8802F", "#8D5A9E",
+                         "#178A66", "#B34A6F", "#6B8F3D", "#5F6CBF"];
+// Same hues, darkened just enough that 11px WHITE chip text clears AA (≥4.5:1)
+// on every slot. Four of the chart colors were 3.6–4.3:1 as a chip fill. The
+// chart keeps STATION_PALETTE untouched — those values are CVD-validated as a
+// set, and re-tuning them for a text-on-fill case would break that.
+const STATION_CHIP_PALETTE = ["#B55938", "#2E7BA8", "#906E28", "#8D5A9E",
+                              "#168462", "#B34A6F", "#5E7E36", "#5F6CBF"];
+function _stationSlot(id) {
+  return Math.max(0, stations.findIndex(s => s.station_id === id));
+}
+function stationColor(id) {          // chart trace color
+  return STATION_PALETTE[_stationSlot(id) % STATION_PALETTE.length];
+}
+function stationChipColor(id) {      // chip fill behind white text
+  return STATION_CHIP_PALETTE[_stationSlot(id) % STATION_CHIP_PALETTE.length];
 }
 
 let _modelChipsPopulated = false;
@@ -4201,7 +4314,8 @@ function populateModelStationChips() {
     const sync = () => {
       const on = modelStations.has(s.station_id);
       b.classList.toggle("active", on);
-      b.style.background = on ? stationColor(s.station_id) : "transparent";
+      b.style.background  = on ? stationChipColor(s.station_id) : "transparent";
+      b.style.borderColor = on ? stationColor(s.station_id) : "";
     };
     sync();
     b.addEventListener("click", () => {
@@ -4256,12 +4370,12 @@ function _renderModelChartImpl() {
       band.push({ x: stats.x, y: stats.hi, mode: "lines", line: { width: 0 },
         hoverinfo: "skip", showlegend: false, name: "+1σ" });
       band.push({ x: stats.x, y: stats.lo, mode: "lines", line: { width: 0 },
-        fill: "tonexty", fillcolor: "rgba(100,100,100,0.16)",
+        fill: "tonexty", fillcolor: "rgba(117,113,100,0.16)",
         hoverinfo: "skip", name: "Inter-station ±1σ" });
     }
     if (stats.x.length) {
       lines.push({ x: stats.x, y: stats.mean, name: "In-situ mean (network)",
-        mode: "lines", line: { color: "#111827", width: 2.6 }, connectgaps: false });
+        mode: "lines", line: { color: "#1F1E1D", width: 2.6 }, connectgaps: false });
     }
   }
 
@@ -4411,8 +4525,11 @@ function _renderModelChartImpl() {
   const domRight = nR <= 1 ? 1 : (nR === 2 ? 0.90 : 0.82);
   const layout = {
     margin: { l: 55, r: nR >= 3 ? 72 : (nR ? 55 : 15), t: 10, b: 40 },
-    xaxis: { type: "date", domain: [0, domRight] },
-    yaxis: { title: { text: leftTitle } },
+    font: { family: CHART_FONT, color: "#1F1E1D" },
+    plot_bgcolor: "#fff",
+    paper_bgcolor: "#fff",
+    xaxis: { type: "date", domain: [0, domRight], gridcolor: "#ECE9E0" },
+    yaxis: { title: { text: leftTitle }, gridcolor: "#ECE9E0", zerolinecolor: "#DDD9CC" },
     legend: { orientation: "h", y: -0.18 },
     hovermode: "x unified",
     barmode: "overlay",
@@ -4920,10 +5037,10 @@ function renderLbandCalendar() {
   if (hint) {
     if (uavPayload === "lband") {
       hint.textContent = Object.keys(flightsByDate).length
-        ? "Red-filled days have a flight. Click to add/remove from the map."
+        ? "Highlighted days have a flight. Click to add/remove from the map."
         : "No L-band flights catalogued yet.";
     } else if (Object.keys(flightsByDate).length) {
-      hint.textContent = `Red-filled days have a ${PAYLOAD_TITLE[uavPayload]} flight. Click to view it on the In-situ map.`;
+      hint.textContent = `Highlighted days have a ${PAYLOAD_TITLE[uavPayload]} flight. Click to view it on the In-situ map.`;
     } else {
       hint.textContent = `${PAYLOAD_TITLE[uavPayload]}: no flights catalogued for this payload yet.`;
     }
@@ -5384,7 +5501,7 @@ function renderSatCalendar() {
   if (hint) {
     const title = SAT_TITLE[`${satProductSource}:${satProductName}`] || `${satProductSource} ${satProductName}`;
     hint.textContent = Object.keys(scenesByDate).length
-      ? `Red-filled days have a ${title.split(" (")[0]} scene. Click to add/remove from the map.`
+      ? `Highlighted days have a ${title.split(" (")[0]} scene. Click to add/remove from the map.`
       : `${title}: no scenes catalogued for this product.`;
   }
 
@@ -5928,8 +6045,8 @@ const CF_BEACON_TOKEN = "d47bd3acc7f44026bcac8bfb1f11adfe";   // Cloudflare Web 
     const tokenOk = CF_BEACON_TOKEN && CF_BEACON_TOKEN !== "YOUR_CF_TOKEN" && CF_BEACON_TOKEN.length >= 16;
     const beacon  = document.querySelector('script[src*="cloudflareinsights.com/beacon"]');
     status.innerHTML = `
-      <div>Beacon script in DOM: <b style="color:${beacon ? '#4ade80' : '#f87171'};">${beacon ? "yes" : "no"}</b></div>
-      <div>Token configured: <b style="color:${tokenOk ? '#4ade80' : '#f87171'};">${tokenOk ? "yes" : "no (still YOUR_CF_TOKEN)"}</b></div>
+      <div>Beacon script in DOM: <b style="color:${beacon ? '#15803D' : '#B3403A'};">${beacon ? "yes" : "no"}</b></div>
+      <div>Token configured: <b style="color:${tokenOk ? '#15803D' : '#B3403A'};">${tokenOk ? "yes" : "no (still YOUR_CF_TOKEN)"}</b></div>
       <div style="margin-top:6px;color:var(--muted);font-size:11px;">
         ${tokenOk
           ? "Tracking is active. Stats refresh every ~5 min on Cloudflare."

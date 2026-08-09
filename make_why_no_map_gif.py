@@ -34,14 +34,19 @@ ROOT = Path(__file__).parent
 ASSETS = ROOT / "assets"
 ASSETS.mkdir(exist_ok=True)
 
-# ---- palette (site dark theme) -------------------------------------------
-BG     = "#0f172a"   # slate-900 — matches the side-panel card background
-INK    = "#e2e8f0"
-MUTED  = "#94a3b8"
-ACCENT = "#f43f5e"   # rose — cal/val cell + stations
-LINEC  = "#38bdf8"   # sky — the model series
-GRIDC  = "#e2e8f0"
+# ---- palette (site warm-light theme; mirrors :root in index.html) --------
+# Must track the CSS tokens: BG = --panel (the card this GIF sits on),
+# INK = --text, MUTED = --muted, ACCENT = --accent-solid, LINEC = the blue
+# slot of the chart palette. If the theme moves, re-run this script.
+BG     = "#f0eee6"   # bone — matches the side-panel card background
+INK    = "#1f1e1d"
+MUTED  = "#63625a"
+ACCENT = "#b85434"   # terracotta — cal/val cell + stations
+LINEC  = "#2e7ba8"   # blue — the model series
+GRIDC  = "#1f1e1d"
 
+# Soil-moisture ramp: data semantics, deliberately NOT rebranded — it is the
+# same dry→wet reading as the site's own SM colormap.
 SM_CMAP = LinearSegmentedColormap.from_list(
     "sm", ["#e9d8a6", "#94d2bd", "#0a9396", "#005f73", "#03045e"])
 
