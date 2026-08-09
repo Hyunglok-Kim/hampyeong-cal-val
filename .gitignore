@@ -11,6 +11,14 @@ data/satellites/raw/
 # Picture originals — only the _web/ thumbnails travel to the host.
 data/pictures/**/_orig/
 
+# Team-photo originals (413x531) kept for re-cropping; the site ships the
+# 360x360 squares next to them.
+photos/team/_originals/
+
+# Contact sheet make_why_no_map_gif.py writes beside the GIF — a debugging
+# aid for checking frames; the page only loads the .gif itself.
+assets/why-no-map-frames.png
+
 # Editor / OS
 .vscode/
 .idea/
