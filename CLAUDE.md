@@ -15,9 +15,17 @@ History (2026-08-08 consolidation): the checkout used to live at
 `~/Insync/hkim@geol.sc.edu/Google Drive/website/hampyeong_data_portal/`.
 Both were retired — everything moved here, deliberately **outside** any
 cloud-sync folder (Insync clobbered files mid-run; see Known gotchas).
-Design/source assets that lived next to the old mirror (partner logos,
-web_design.pptx, KMZ, photo originals) are in
-`~/orca/projects/hampyeong-portal-assets/`.
+
+A third folder, `~/orca/projects/hampyeong-portal-assets/`, held "source"
+assets next to the old mirror. It was **deleted on 2026-08-09** after a
+file-by-file diff showed it was almost entirely stale duplicates: its 8
+partner logos were md5-identical to `logos/`, and its 61 "installation"
+photos were 288×288 downscales of the 384×384 originals already in
+`photos/sensors/`. The five files that were *not* redundant were moved
+into this repo first (2 sensor photos, `logos/hydroai_white.png`, and the
+413×531 team-photo originals under `photos/team/_originals/`, gitignored).
+`web_design.pptx` (superseded by the 2026-08 redesign) and a gridlines KMZ
+(superseded by `data/grid/nested_grids.json`) were discarded.
 
 ## Quick start
 
@@ -367,7 +375,10 @@ when editing `index.html` or the data pipelines:
 - **CDN `<script>` tags live at the bottom of `<body>`**, not `<head>` —
   UI markup + the boot skeleton paint before ~400 KB of JS downloads.
   They are classic (non-defer) tags so execution order (Leaflet → Plotly →
-  Papa → app script) is guaranteed. `<head>` keeps preconnect hints only.
+  Papa → app script) is guaranteed. `<head>` keeps preconnect hints, the
+  Leaflet CSS, and (since the 2026-08 redesign) one Google Fonts stylesheet
+  (Source Serif 4 + Archivo, `display=swap`, ~70 KB of woff2 loaded
+  async) — that's the accepted budget; don't add more font weights casually.
 - **Boot skeleton** `#bootOverlay` is the first element in `<body>`;
   `window.dismissBootOverlay()` is called from the stations-load callback
   (success and error), with a 15 s safety timer armed pre-paint.
@@ -395,6 +406,62 @@ when editing `index.html` or the data pipelines:
   drawn (sensors do legitimately report low values).
 
 ## Front-end UI conventions (index.html)
+
+### Design system (Claude-style, 2026-08 redesign)
+
+The whole UI was reskinned to a Claude/Anthropic-inspired warm-light theme.
+Everything lives in the `:root` tokens at the top of the `<style>` block:
+
+- **Surfaces**: page `--bg #FAF9F5` (ivory) · cards/panels `--panel #F0EEE6`
+  (bone) · map/chart wells `--surface #fff`. There is **no dark panel
+  anymore** — `--panel-text`/`--muted` are dark-on-light values, and the old
+  `--border-dark` name now holds a *light* hairline (kept for compat).
+- **Accent**: terracotta `--accent #D97757` for fills, borders and native
+  control accents; `--accent-solid #B85434` wherever **white text sits on
+  it** (buttons, active pills, selected calendar day, checked flight box) —
+  `#D97757` is only 3.12:1 against white and fails AA, `#B85434` is 4.82:1.
+  `--accent-hover #C15F3C`, `--accent-deep #9C4A2F` (small accent text).
+  Support/Donate keeps its own semantic warm red (`--support #B0402F`).
+- **Contrast rule**: every text/background pair in the theme clears WCAG AA
+  4.5:1 — including 10px labels. `--muted` is `#63625A` (5.28:1 on bone,
+  5.82:1 on ivory); `--muted-on-light` is the same value, so one token is
+  safe on every surface. If you introduce a new tint, check it before
+  shipping — the earlier `#75746A` looked fine and measured 4.05:1.
+- **Type**: display serif "Source Serif 4" (`--font-display`) for section
+  headings / station-id / About article / stats numbers; UI sans "Archivo"
+  (`--font-ui`). Both load from Google Fonts (`display=swap`); Plotly charts
+  use the same stack via the JS `CHART_FONT` constant.
+- **Chart palette** (validated for CVD with the dataviz six-checks script):
+  terracotta `#C15F3C`, blue `#2E7BA8`, gold `#A8802F`, plum `#8D5A9E`,
+  teal `#178A66` — fixed assignment in `MODEL_META` and first slots of
+  `STATION_PALETTE`. In-situ trace banks (`PALETTE`) keep semantics:
+  SM = blues, temp = terracotta/rust, precip = teals.
+- **Unchanged on purpose** (data semantics, don't "brand" these):
+  scientific colormap gradients (`COLORBARS`, `smToColor`), EASE-Grid cell
+  outline colors, red recent-pulse + blue soil-pulse rings, SAR grayscale.
+- **Signature**: the boot overlay is a terracotta starburst SVG + serif
+  wordmark; `prefers-reduced-motion` stops the spin and freezes the pulse
+  rings into static halos. **The frozen rings must differ in radius** (red
+  3px, blue 7px): the two pseudo-elements share identical geometry, so
+  equal spreads let `.recent::after` paint over `.soil::before` and a
+  station that is both recent *and* sampled would show only red.
+- **Deep link**: `?tab=uav|sat|model|about|team|pic|support` opens that tab
+  on load. Two constraints, each from a real bug: it runs on
+  DOMContentLoaded (clicking during script evaluation hit `let` bindings
+  still in their TDZ and blanked the Models chart), and it clicks only
+  **visible** tabs (`offsetParent !== null`) so `?tab=analytics` cannot
+  walk past the `?admin=` gate on the hidden Analytics tab.
+- **Station chips vs chart lines**: the Models tab chips fill with
+  `STATION_CHIP_PALETTE` (the same hues darkened until 11px white text
+  clears AA) while the chart line uses `STATION_PALETTE`; the chip's
+  *border* carries the chart color so the two still read as a pair. Don't
+  collapse them back into one list — the chart palette is CVD-validated as
+  a set and re-tuning it for a text-on-fill case would break that.
+- **`assets/why-no-map.gif`** is generated by `make_why_no_map_gif.py`, and
+  its background is painted to match `--panel` so it reads as part of the
+  card. It is a raster: theme edits do **not** reach it. If the tokens
+  change, update the palette constants at the top of that script and re-run
+  it (needs conda `python3` — matplotlib is not in `/usr/bin/python3`).
 
 ### Layer toggles (left of map)
 
@@ -449,9 +516,10 @@ AI prediction · Visitor History · **About Data** · **Team** · Support.
   hidden, no side panel). Cards: Mr. Jaegyun (UAV observation lead),
   Mr. Namhoon (UAV observation support), Mr. Kunhee (sensor installation &
   maintenance, whole network). Photos: `photos/team/*.jpg` — 360×360 square
-  crops made from the originals kept in
-  `~/orca/projects/hampyeong-portal-assets/photos/team/`. Add a card +
-  photo when a student joins.
+  crops. Jaegyun's and Namhoon's 413×531 originals sit beside them in
+  `photos/team/_originals/` (gitignored) for re-cropping; Kunhee's source
+  was already smaller than the crop, so there is none. Add a card + photo
+  when a student joins.
 - **About Data** — first-time-visitor explainer of everything the site
   collects (site geometry, in-situ network, UAV payloads, satellite product
   table, basemaps, data-flow, access policy). Swaps the map column for a
