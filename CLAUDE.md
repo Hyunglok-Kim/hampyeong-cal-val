@@ -398,6 +398,19 @@ when editing `index.html` or the data pipelines:
   station advances by a year the indicator stays meaningful. Adjust the
   threshold via `RECENT_DAYS`, recolour via the `.station-dot.recent::after`
   + `@keyframes` rgb values.
+- **Cursor lat/lon readout** — bottom-left Leaflet control (`.coord-readout`,
+  `renderCoord()` in `index.html`). Shows `35.01508°N, 126.55083°E` at 5 dp
+  (~1.1 m, finer than the 200 m grid) as the pointer moves; clicking the box
+  copies the bare `lat, lon` decimal form instead — the same form
+  `stations.csv` uses, so a point read off the map pastes into a script.
+  Three constraints, each deliberate: (1) `L.DomEvent.disableClickPropagation`
+  on the container, or clicking to copy also fires a map click; (2) the copy
+  falls back to `document.execCommand` because a cross-origin iframe (the
+  Webflow embed) refuses `navigator.clipboard` without `allow="clipboard-write"`;
+  (3) `(hover: none)` devices get "tap for lat/lon" and update from map clicks,
+  since `mousemove` never fires there. The "copied" flash background must stay
+  **opaque** — the box floats over aerial imagery, and the 10 %-alpha
+  `--accent-tint` let the photo show through the text.
 - **Missing TS cells render as gaps** — Empty / null CSV cells used to
   coerce to 0 via `+r[v.name]` and made the chart drop to zero. Replaced
   with a `cell()` helper that returns `null` for non-finite values and

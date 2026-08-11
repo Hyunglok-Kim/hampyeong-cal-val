@@ -365,6 +365,34 @@
     border-radius: var(--radius-sm);
     background: #ffffff;       /* shows through when Aerial imagery is off */
   }
+  /* Cursor lat/lon readout (bottom-left Leaflet control). Monospace + fixed
+     decimals so the box doesn't twitch as the numbers change. */
+  .coord-readout {
+    background: rgba(250, 249, 245, 0.93);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--text);
+    box-shadow: var(--shadow-sm);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+  .coord-readout.idle {
+    color: var(--muted-on-light);
+    font-family: var(--font-ui);
+  }
+  .coord-readout.copied {
+    border-color: var(--accent);
+    /* --accent-tint pre-blended onto ivory: the box sits over aerial imagery,
+       so a translucent wash would let the photo through the text (5.28:1 as
+       an opaque fill). */
+    background: #F7ECE5;
+    color: var(--accent-deep);
+  }
   .map-controls {
     background: var(--panel);
     color: var(--panel-text);
@@ -1077,6 +1105,10 @@
     }
     .map-col, .side { min-width: 0; }
     #map { height: 360px; }
+
+    /* the map is only 360 px tall here — keep the coordinate box off the data */
+    .coord-readout { font-size: 10px; padding: 3px 6px; }
+    .leaflet-bottom.leaflet-left .leaflet-control { margin: 6px; }
 
     /* map control rows: allow wrapping; clip anything that still won't fit */
     .map-controls { padding: 10px; overflow-x: auto; }
@@ -2430,6 +2462,113 @@ window._maybeDismissBoot = function () {
   if (window._bootTilesReady && window._bootStationsReady) window.dismissBootOverlay?.();
 };
 imageryLayer.once("load", () => { window._bootTilesReady = true; window._maybeDismissBoot(); });
+
+// =============================================================
+// Cursor coordinate readout — bottom-left of the map (attribution keeps
+// bottom-right, zoom keeps top-left).
+// The screen form is signed-free with hemisphere letters, but the value it
+// copies is bare decimal degrees "lat, lon" — the same form stations.csv
+// uses, so a point read off the map pastes straight into a script.
+// Touch devices have no hover, so there it reports the last tapped point.
+// =============================================================
+const COORD_DP = 5;                     // ~1.1 m — finer than the 200 m grid
+const COORD_HOVER = !window.matchMedia?.("(hover: none)").matches;
+const COORD_IDLE_TEXT = COORD_HOVER ? "hover for lat/lon" : "tap for lat/lon";
+
+const coordCtl = L.control({ position: "bottomleft" });
+coordCtl.onAdd = function () {
+  const div = L.DomUtil.create("div", "coord-readout idle");
+  div.title = COORD_HOVER ? "Click to copy" : "Tap to copy";
+  L.DomEvent.disableClickPropagation(div);   // clicking the box must not click the map
+  return div;
+};
+coordCtl.addTo(map);
+const coordBox = coordCtl.getContainer();
+
+let coordLatLng = null;                 // last point shown, or null while idle
+let coordFlashTimer = null;
+
+function renderCoord(latlng) {
+  coordLatLng = latlng;
+  coordBox.classList.remove("copied");
+  if (!latlng) {
+    coordBox.classList.add("idle");
+    coordBox.textContent = COORD_IDLE_TEXT;
+    return;
+  }
+  const [lat, lon] = coordPair(latlng);
+  coordBox.classList.remove("idle");
+  coordBox.textContent =
+    `${Math.abs(lat).toFixed(COORD_DP)}°${lat < 0 ? "S" : "N"}, ` +
+    `${Math.abs(lon).toFixed(COORD_DP)}°${lon < 0 ? "W" : "E"}`;
+}
+
+// Dragging past the antimeridian leaves lng at 186.5 etc; wrap before display
+// so a copied coordinate is always a valid one.
+function coordPair(latlng) {
+  const w = latlng.wrap();
+  return [w.lat, w.lng];
+}
+
+renderCoord(null);
+
+// mousemove fires per pixel — coalesce to one paint per frame.
+let coordPending = null, coordFrame = 0, coordInside = false;
+map.on("mousemove", e => {
+  coordPending = e.latlng;
+  coordInside = true;
+  if (coordFrame) return;
+  coordFrame = requestAnimationFrame(() => {
+    coordFrame = 0;
+    if (coordFlashTimer) return;        // don't stomp the "copied" flash
+    renderCoord(coordPending);
+  });
+});
+map.on("mouseout", () => {
+  coordInside = false;
+  if (!coordFlashTimer) renderCoord(null);
+});
+map.on("click", e => { if (!COORD_HOVER) renderCoord(e.latlng); });
+
+coordBox.addEventListener("click", () => {
+  if (!coordLatLng) return;
+  const [lat, lon] = coordPair(coordLatLng);
+  const text = `${lat.toFixed(COORD_DP)}, ${lon.toFixed(COORD_DP)}`;
+  const held = coordLatLng;
+  Promise.resolve(copyText(text)).then(ok => {
+    coordBox.classList.toggle("copied", ok);
+    coordBox.textContent = ok ? `copied  ${text}` : "copy blocked — select manually";
+    clearTimeout(coordFlashTimer);
+    coordFlashTimer = setTimeout(() => {
+      coordFlashTimer = null;
+      // On a pointer device the cursor may have left the map during the
+      // flash — going back to the idle prompt beats a stale coordinate.
+      renderCoord(!COORD_HOVER || coordInside ? held : null);
+    }, 1200);
+  });
+});
+
+function copyText(text) {
+  // The async clipboard API is refused inside a cross-origin iframe without
+  // allow="clipboard-write" (our Webflow embed), so keep the legacy path —
+  // it still works there because we are inside a click handler.
+  const legacy = () => {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.cssText = "position:absolute;left:-9999px;top:0;";
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (_) { ok = false; }
+    ta.remove();
+    return ok;
+  };
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text).then(() => true, legacy);
+  }
+  return legacy();
+}
 
 // =============================================================
 // Custom panes — fixes the z-order so station markers (default
